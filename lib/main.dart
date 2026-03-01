@@ -1,10 +1,12 @@
+import 'package:PlantPulse/scan.dart';
 import 'package:flutter/material.dart';
-import 'package:plantpulse/forgetPassword.dart';
-import 'package:plantpulse/sendOTP.dart';
+import 'forgetPassword.dart';
+import 'sendOTP.dart';
 import 'register.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'onboarding.dart';
 import 'login.dart';
+import 'homePage.dart';
 import 'changePassword.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +33,7 @@ class MyApp extends StatelessWidget {
 
       initialRoute: seen ? 'Login' :  'OnBoardingScreen', //دي عشان تظهر مرة واحدة بس سطر مهم ممنوع المسح
       routes: {
+        'HomePage': (context) => HomePage(),
         'Login': (context) => Login(),
         'OnBoardingScreen': (context) => OnBoardingScreen(),
         'Register': (context) => Register(),

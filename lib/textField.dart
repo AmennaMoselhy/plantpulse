@@ -6,6 +6,9 @@ class Textfield extends StatefulWidget {
   final bool isPassword;
   final TextInputType? keyboardType;
   final int? maxLines;
+  final TextEditingController? controller;
+  final String? Function(String?)? validator;
+  final bool enabled;
 
   const Textfield({
     required this.title,
@@ -13,6 +16,9 @@ class Textfield extends StatefulWidget {
     this.isPassword = false,
     this.keyboardType,
     this.maxLines = 1,
+    this.controller,
+    this.validator,
+    this.enabled = true,
   });
 
   @override
@@ -36,7 +42,10 @@ class _TextfieldState extends State<Textfield> {
           ),
         ),
         const SizedBox(height: 8),
-        TextField(
+        TextFormField(
+          controller: widget.controller,
+          validator: widget.validator,
+          enabled: widget.enabled,
           obscureText: widget.isPassword ? password_hidden : false,
           keyboardType: widget.keyboardType,
           maxLines: widget.maxLines,

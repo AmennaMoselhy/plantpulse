@@ -1,4 +1,4 @@
-name: plantpulse
+name: PlantPulse
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -31,6 +31,7 @@ dependencies:
   flutter_native_splash: ^2.4.7
   introduction_screen: ^4.0.0
   shared_preferences: ^2.5.4
+  flutter_svg: ^2.0.10+1
   pin_code_fields: ^9.1.0
 
 
@@ -88,7 +89,9 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 flutter_native_splash:
-  image: assets/splashscreen.png
+  android_gravity: center
+  ios_content_mode: center
+  image: assets/test.png
   color: "#ffffff"
   android_12:
     image: splashscreen/figma.png

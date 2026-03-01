@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plantpulse/main.dart';
+import 'package:PlantPulse/main.dart';
 
 void main() {
   testWidgets('App loads', (WidgetTester tester) async {

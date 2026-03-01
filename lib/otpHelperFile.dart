@@ -35,16 +35,6 @@ class OTPHelper extends StatelessWidget {
         children: [
           Stack(
             children: [
-              GestureDetector(
-                onTap: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  size: 24,
-                  color: const Color(0xFF4A4A4A),
-                ),
-              ),
               Center(
                 child: Image.asset(
                   'assets/phoneframe.png',
@@ -89,15 +79,18 @@ class OTPHelper extends StatelessWidget {
                       borderColor: const Color(0xFF868686),
                       borderRadius: BorderRadius.circular(4),
                       focusedBorderColor: const Color(0xFF399B25),
+                      cursorColor: const Color(0xFF399B25),
+
                       cellSize: Size(size.width * 0.133, size.height * 0.0493),
                     ),
                   ),
                 ),
           SizedBox(height: size.height * 0.0394),
           GreenButton(text: button_text, onPress: onPress),
-          ?!isEmail ? SizedBox(height: size.height * 0.0591) : null,
-          ?!isEmail
-              ? DownText(
+          if (!isEmail) SizedBox(height: size.height * 0.0591),
+
+          if (!isEmail)
+            DownText(
                   text1: "Didn’t received code?",
                   text2: "Resend code",
                   fun: () {
@@ -109,7 +102,6 @@ class OTPHelper extends StatelessWidget {
                     );
                   },
                 )
-              : null,
         ],
       ),
     );

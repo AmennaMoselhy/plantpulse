@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:plantpulse/greenButton.dart';
+import 'greenButton.dart';
 import 'upGreenPlantPulse.dart';
 import 'textField.dart';
 
@@ -8,6 +8,7 @@ class ChangePassword extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     return Scaffold(
+      extendBodyBehindAppBar: true,
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: ListView(

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:plantpulse/upGreenPlantPulse.dart';
+import 'upGreenPlantPulse.dart';
 import 'textField.dart';
 import 'greenButton.dart';
-import 'package:plantpulse/downText.dart';
-import 'package:plantpulse/logWithFacebook.dart';
+import 'downText.dart';
+import 'logWithFacebook.dart';
 
 class Login extends StatefulWidget {
   const Login({Key? key}) : super(key: key);
@@ -12,17 +12,25 @@ class Login extends StatefulWidget {
 }
 class _LoginState extends State<Login> {
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
   @override
   void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       resizeToAvoidBottomInset: true,
       body: SafeArea(
+        top: true,
         child: _buildBody(),
       ),
     );
@@ -75,13 +83,15 @@ class _LoginState extends State<Login> {
   }
   Widget _buildEmailField() {
     return Textfield(
+      controller: _emailController,
       keyboardType: TextInputType.emailAddress,
       title: "Email",
       hint_text: "Enter Your Email",
     );
   }
   Widget _buildPasswordField() {
-    return const Textfield(
+    return Textfield(
+      controller: _passwordController,
       keyboardType: TextInputType.visiblePassword,
       title: "Password",
       hint_text: "Enter Your Password",
@@ -134,9 +144,9 @@ class _LoginState extends State<Login> {
   }
 
   void _handleLogin() {
-    if (_formKey.currentState?.validate() ?? false) {
-      print('Email:');
-      print('Password:');
+    if (_formKey.currentState!.validate()) {
+      String name = "";
+      Navigator.of(context).pushNamed('HomePage', arguments: name);
     }
   }
 }
