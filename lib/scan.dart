@@ -147,37 +147,6 @@ class _ScanState extends State<Scan> {
           ),
         ),
       ),
-
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFFEBF5E9),
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: 1,
-          selectedItemColor: const Color(0xFF2E7D32),
-          unselectedItemColor: Colors.grey,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          type: BottomNavigationBarType.fixed,
-          selectedLabelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 11, fontWeight: FontWeight.w600),
-          unselectedLabelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 11),
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.qr_code_scanner), label: 'Scan'),
-            BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Recent Scan'),
-            BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
-          ],
-          onTap: (index) {
-            if (index == 0) Navigator.pushNamed(context, 'HomePage');
-            if (index == 2) Navigator.pushNamed(context, 'RecentScan');
-            if (index == 3) Navigator.pushNamed(context, 'Profile');
-          },
-        ),
-      ),
     );
   }
 

@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'result_page.dart';
 
 class ScanProcessing extends StatefulWidget {
   final String imagePath;
@@ -270,12 +269,6 @@ class _ScanProcessingState extends State<ScanProcessing>
           height: 52,
           child: ElevatedButton(
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ResultPage(imagePath: widget.imagePath),
-                ),
-              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2E7D32),
