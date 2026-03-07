@@ -33,6 +33,7 @@ dependencies:
   shared_preferences: ^2.5.4
   flutter_svg: ^2.0.10+1
   pin_code_fields: ^9.1.0
+  image_picker: ^1.0.4
 
 
   flutter:
