@@ -3,6 +3,7 @@ import 'textField.dart';
 import 'greenButton.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
 import 'downText.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class OTPHelper extends StatelessWidget {
   final String title;
@@ -91,17 +92,19 @@ class OTPHelper extends StatelessWidget {
 
           if (!isEmail)
             DownText(
-                  text1: "Didn’t received code?",
-                  text2: "Resend code",
-                  fun: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text("Code is being sent again..."),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                )
+              text1: "Didn’t received code?",
+              text2: "Resend code",
+              fun: () {
+                Fluttertoast.showToast(
+                  msg: "Code is being sent again...",
+                  toastLength: Toast.LENGTH_SHORT,
+                  gravity: ToastGravity.BOTTOM,
+                  backgroundColor: const Color(0xFF399B25),
+                  textColor: Colors.white,
+                  fontSize: 14,
+                );
+              },
+            ),
         ],
       ),
     );

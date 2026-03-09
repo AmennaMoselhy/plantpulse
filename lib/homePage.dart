@@ -13,60 +13,66 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
-
+  String _firstName = '';
+  String _fullName = '';
+  bool _initialized = false;
 
   @override
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)!.settings.arguments as Map;
-    final String firstName = args['firstName'];
-    final String fullName = args['fullName'];
-    final List<Widget> _pages = [
-      HomePageContent(firstName: firstName),
-      Scan(),
-      RecentScan(),
-      Profile(fullName: fullName),
+
+    // ✅ بناخد الـ args مرة واحدة بس عشان مش يرجع للقديم
+    if (!_initialized) {
+      _firstName = args['firstName'];
+      _fullName = args['fullName'];
+      _initialized = true;
+    }
+
+    final List<Widget> pages = [
+      HomePageContent(firstName: _firstName),
+      const Scan(),
+      const RecentScan(),
+      Profile(
+        fullName: _fullName,
+        onNameChanged: (newName) {
+          setState(() {
+            _firstName = newName.split(' ')[0];
+            _fullName = newName;
+          });
+        },
+      ),
     ];
 
     return Scaffold(
-      body: _pages[_currentIndex],
+      body: pages[_currentIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Color(0xFFEBF5E9),
-          borderRadius: BorderRadius.only(
+          color: const Color(0xFFEBF5E9),
+          borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(24),
             topRight: Radius.circular(24),
           ),
           boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.only(
+          borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(24),
             topRight: Radius.circular(24),
           ),
           child: BottomNavigationBar(
             currentIndex: _currentIndex,
-            onTap: (index) {
-              setState(() {
-                _currentIndex = index;
-              });
-            },
-            backgroundColor: Color(0XFFEBF5E9),
-            selectedItemColor: Color(0xFF399B25),
-            unselectedItemColor: Color(0xFF4A4A4A),
+            onTap: (index) => setState(() => _currentIndex = index),
+            backgroundColor: const Color(0XFFEBF5E9),
+            selectedItemColor: const Color(0xFF399B25),
+            unselectedItemColor: const Color(0xFF4A4A4A),
             type: BottomNavigationBarType.fixed,
-            selectedLabelStyle: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 10,
-            ),
-            unselectedLabelStyle: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 10,
-            ),
+            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 10),
+            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 10),
             items: [
               BottomNavigationBarItem(
                 icon: ColorFiltered(
                   colorFilter: ColorFilter.mode(
-                    _currentIndex == 0 ? Color(0xFF399B25) : Color(0xFF4A4A4A),
+                    _currentIndex == 0 ? const Color(0xFF399B25) : const Color(0xFF4A4A4A),
                     BlendMode.srcIn,
                   ),
                   child: Image.asset('assets/home.png', width: 24, height: 24),
@@ -76,7 +82,7 @@ class _HomePageState extends State<HomePage> {
               BottomNavigationBarItem(
                 icon: ColorFiltered(
                   colorFilter: ColorFilter.mode(
-                    _currentIndex == 1 ? Color(0xFF399B25) : Color(0xFF4A4A4A),
+                    _currentIndex == 1 ? const Color(0xFF399B25) : const Color(0xFF4A4A4A),
                     BlendMode.srcIn,
                   ),
                   child: Image.asset('assets/scan.png', width: 24, height: 24),
@@ -86,28 +92,20 @@ class _HomePageState extends State<HomePage> {
               BottomNavigationBarItem(
                 icon: ColorFiltered(
                   colorFilter: ColorFilter.mode(
-                    _currentIndex == 2 ? Color(0xFF399B25) : Color(0xFF4A4A4A),
+                    _currentIndex == 2 ? const Color(0xFF399B25) : const Color(0xFF4A4A4A),
                     BlendMode.srcIn,
                   ),
-                  child: Image.asset(
-                    'assets/recentScan.png',
-                    width: 24,
-                    height: 24,
-                  ),
+                  child: Image.asset('assets/recentScan.png', width: 24, height: 24),
                 ),
                 label: 'Recent Scan',
               ),
               BottomNavigationBarItem(
                 icon: ColorFiltered(
                   colorFilter: ColorFilter.mode(
-                    _currentIndex == 3 ? Color(0xFF399B25) : Color(0xFF4A4A4A),
+                    _currentIndex == 3 ? const Color(0xFF399B25) : const Color(0xFF4A4A4A),
                     BlendMode.srcIn,
                   ),
-                  child: Image.asset(
-                    'assets/profile.png',
-                    width: 24,
-                    height: 24,
-                  ),
+                  child: Image.asset('assets/profile.png', width: 24, height: 24),
                 ),
                 label: 'Profile',
               ),

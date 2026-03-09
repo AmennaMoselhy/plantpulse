@@ -8,6 +8,7 @@ import 'onboarding.dart';
 import 'login.dart';
 import 'homePage.dart';
 import 'changePassword.dart';
+import 'recentScan.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +39,7 @@ class MyApp extends StatelessWidget {
         'Send_OTP': (context) => SendOTP(),
         'Change_Password': (context) => ChangePassword(),
         'ScanPage': (context) => Scan(),
+        'RecentScan': (context) => RecentScan(),
       },
     );
   }
