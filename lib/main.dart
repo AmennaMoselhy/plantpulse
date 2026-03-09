@@ -9,6 +9,7 @@ import 'login.dart';
 import 'homePage.dart';
 import 'changePassword.dart';
 import 'recentScan.dart';
+import 'resultscan.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,6 +35,8 @@ class MyApp extends StatelessWidget {
         'Change_Password': (context) => ChangePassword(),
         'ScanPage': (context) => const Scan(),
         'RecentScan': (context) => const RecentScan(),
+        'ResultPage': (context) => const ResultPage(imagePath: '', plantName: 'Lettuce', status: 'Healthy'),
+
       },
     );
   }
