@@ -34,6 +34,8 @@ dependencies:
   flutter_svg: ^2.0.10+1
   pin_code_fields: ^9.1.0
   image_picker: ^1.0.4
+  path_provider: ^2.1.2
+  fluttertoast: ^8.2.4
 
 
   flutter:
@@ -90,10 +92,10 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 flutter_native_splash:
-  android_gravity: center
-  ios_content_mode: center
-  image: assets/test.png
+  fullscreen: true
+  image: assets/splash_full.png
   color: "#ffffff"
   android_12:
-    image: splashscreen/figma.png
+    fullscreen: true
+    image: assets/splashscreen.png
     color: "#ffffff"

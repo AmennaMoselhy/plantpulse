@@ -11,21 +11,16 @@ class Register extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       resizeToAvoidBottomInset: true,
-      extendBodyBehindAppBar: true,
-      body: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          physics: const BouncingScrollPhysics(),
-
-          children: [
-            UpGreenPlantPulse(),
-            const SizedBox(height: 20),
-            const _RegisterForm(),
-          ],
-        ),
+      body: ListView(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        physics: const BouncingScrollPhysics(),
+        children: [
+          UpGreenPlantPulse(),
+          const SizedBox(height: 20),
+          const _RegisterForm(),
+        ],
       ),
     );
   }
@@ -43,8 +38,7 @@ class _RegisterFormState extends State<_RegisterForm> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
 
   @override
   void dispose() {
@@ -71,17 +65,12 @@ class _RegisterFormState extends State<_RegisterForm> {
               title: "Name",
               hint_text: "Enter Your Name",
               validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Name is required';
-                }
-                if (value.length < 5) {
-                  return 'Name must be at least 5 characters';
-                }
+                if (value == null || value.isEmpty) return 'Name is required';
+                if (value.length < 5) return 'Name must be at least 5 characters';
                 return null;
               },
             ),
             const SizedBox(height: 12),
-
             Textfield(
               title: "Email",
               hint_text: "Enter Your Email",
@@ -89,7 +78,6 @@ class _RegisterFormState extends State<_RegisterForm> {
               controller: _emailController,
             ),
             const SizedBox(height: 12),
-
             Textfield(
               title: "Password",
               controller: _passwordController,
@@ -98,7 +86,6 @@ class _RegisterFormState extends State<_RegisterForm> {
               keyboardType: TextInputType.visiblePassword,
             ),
             const SizedBox(height: 12),
-
             Textfield(
               controller: _confirmPasswordController,
               title: "Confirm Password",
@@ -121,15 +108,12 @@ class _RegisterFormState extends State<_RegisterForm> {
               },
             ),
             const SizedBox(height: 16),
-
             LoginWithFaceBook(),
             const SizedBox(height: 12),
             DownText(
               text1: "Have an account?",
               text2: "Login",
-              fun: () {
-                Navigator.of(context).pushNamed('Login');
-              },
+              fun: () => Navigator.of(context).pushNamed('Login'),
             ),
           ],
         ),
