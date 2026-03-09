@@ -4,9 +4,10 @@ import 'textField.dart';
 import 'greenButton.dart';
 import 'logWithFacebook.dart';
 import 'downText.dart';
+import 'user_state.dart';
 
 class Register extends StatelessWidget {
-  const Register({Key? key}) : super(key: key);
+  const Register({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +15,8 @@ class Register extends StatelessWidget {
       backgroundColor: Colors.white,
       resizeToAvoidBottomInset: true,
       body: ListView(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        padding: EdgeInsets.zero,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const BouncingScrollPhysics(),
         children: [
           UpGreenPlantPulse(),
@@ -35,10 +37,12 @@ class _RegisterForm extends StatefulWidget {
 
 class _RegisterFormState extends State<_RegisterForm> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  static final _emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$');
 
   @override
   void dispose() {
@@ -49,13 +53,61 @@ class _RegisterFormState extends State<_RegisterForm> {
     super.dispose();
   }
 
+  String? _validateName(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Name is required';
+    if (value.trim().length < 5) return 'Name must be at least 5 characters';
+    return null;
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Email is required';
+    if (!_emailRegex.hasMatch(value.trim())) return 'Enter a valid email';
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) return 'Password is required';
+    if (value.length < 8) return 'Password must be at least 8 characters';
+    return null;
+  }
+
+  String? _validateConfirmPassword(String? value) {
+    if (value == null || value.isEmpty) return 'Please confirm your password';
+    if (value != _passwordController.text) return 'Passwords do not match';
+    return null;
+  }
+
+  void _handleRegister() {
+    FocusScope.of(context).unfocus();
+    if (_formKey.currentState!.validate()) {
+      final firstName = _nameController.text.trim().split(' ')[0];
+      final fullName = _nameController.text.trim();
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+
+      // ✅ حفظ البيانات في userState
+      userState.saveUserData(email: email, password: password);
+
+      Navigator.of(context).pushReplacementNamed(
+        'HomePage',
+        arguments: {
+          'firstName': firstName,
+          'fullName': fullName,
+          'email': email,
+          'password': password,
+        },
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
     return Form(
       key: _formKey,
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.symmetric(horizontal: 24),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: size.width * 0.064),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -64,57 +116,50 @@ class _RegisterFormState extends State<_RegisterForm> {
               keyboardType: TextInputType.name,
               title: "Name",
               hint_text: "Enter Your Name",
-              validator: (value) {
-                if (value == null || value.isEmpty) return 'Name is required';
-                if (value.length < 5) return 'Name must be at least 5 characters';
-                return null;
-              },
+              validator: _validateName,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: size.height * 0.015),
             Textfield(
               title: "Email",
               hint_text: "Enter Your Email",
               keyboardType: TextInputType.emailAddress,
               controller: _emailController,
+              validator: _validateEmail,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: size.height * 0.015),
             Textfield(
               title: "Password",
               controller: _passwordController,
               hint_text: "Enter Your Password",
               isPassword: true,
               keyboardType: TextInputType.visiblePassword,
+              validator: _validatePassword,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: size.height * 0.015),
             Textfield(
               controller: _confirmPasswordController,
               title: "Confirm Password",
               hint_text: "Enter Your Password",
               isPassword: true,
               keyboardType: TextInputType.visiblePassword,
+              validator: _validateConfirmPassword,
             ),
-            const SizedBox(height: 16),
-            GreenButton(
-              text: 'Register',
-              onPress: () {
-                if (_formKey.currentState!.validate()) {
-                  String firstName = _nameController.text.split(' ')[0];
-                  String fullName = _nameController.text;
-                  Navigator.of(context).pushNamed(
-                    'HomePage',
-                    arguments: {'firstName': firstName, 'fullName': fullName},
-                  );
-                }
+            SizedBox(height: size.height * 0.02),
+            GreenButton(text: 'Register', onPress: _handleRegister),
+            SizedBox(height: size.height * 0.02),
+            // ✅ لما يختار إيميل بيتحط في خانة الإيميل
+            LoginWithFaceBook(
+              onEmailSelected: (email) {
+                _emailController.text = email;
               },
             ),
-            const SizedBox(height: 16),
-            LoginWithFaceBook(),
-            const SizedBox(height: 12),
+            SizedBox(height: size.height * 0.015),
             DownText(
               text1: "Have an account?",
               text2: "Login",
               fun: () => Navigator.of(context).pushNamed('Login'),
             ),
+            SizedBox(height: size.height * 0.03),
           ],
         ),
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'user_state.dart';
+import 'recentScan.dart';
 
 class LogoutSheet extends StatelessWidget {
   const LogoutSheet({super.key});
@@ -50,11 +51,14 @@ class LogoutSheet extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {
-                    // ✅ مسح الصورة عند الـ logout
-                    userState.clearProfileImage();
+                    // ✅ مسح كل البيانات
+                    userState.clearAll();
+                    recentScans.clear();
+
                     Navigator.of(
                       context,
                     ).pushNamedAndRemoveUntil('Login', (route) => false);
+
                     Fluttertoast.showToast(
                       msg: "Logged out successfully",
                       toastLength: Toast.LENGTH_SHORT,

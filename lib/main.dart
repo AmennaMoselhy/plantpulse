@@ -10,37 +10,62 @@ import 'homePage.dart';
 import 'changePassword.dart';
 import 'recentScan.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SharedPreferences prefs = await SharedPreferences.getInstance();
-  bool seen = prefs.getBool('seen') ?? false;
-  runApp(MyApp(seen: seen));
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final bool seen;
-  const MyApp({super.key, required this.seen});
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        fontFamily: 'Poppins',
-        useMaterial3: true,
-      ),
-      initialRoute: seen ? 'Login' : 'OnBoardingScreen', //دي عشان تظهر مرة واحدة بس سطر مهم ممنوع المسح
+      theme: ThemeData(fontFamily: 'Poppins', useMaterial3: true),
+      home: const _StartupScreen(), // ✅ بدل initialRoute
       routes: {
         'HomePage': (context) => HomePage(),
-        'Login': (context) => Login(),
-        'OnBoardingScreen': (context) => OnBoardingScreen(),
-        'Register': (context) => Register(),
+        'Login': (context) => const Login(),
+        'OnBoardingScreen': (context) => const OnBoardingScreen(),
+        'Register': (context) => const Register(),
         'Forget_Password': (context) => ForgetPassword(),
         'Send_OTP': (context) => SendOTP(),
         'Change_Password': (context) => ChangePassword(),
-        'ScanPage': (context) => Scan(),
-        'RecentScan': (context) => RecentScan(),
+        'ScanPage': (context) => const Scan(),
+        'RecentScan': (context) => const RecentScan(),
       },
     );
+  }
+}
+
+class _StartupScreen extends StatefulWidget {
+  const _StartupScreen();
+
+  @override
+  State<_StartupScreen> createState() => _StartupScreenState();
+}
+
+class _StartupScreenState extends State<_StartupScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _navigate();
+  }
+
+  Future<void> _navigate() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool('seen') ?? false;
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(
+      context,
+      seen ? 'Login' : 'OnBoardingScreen',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // ✅ شاشة بيضاء ريحة لحد ما يقرر يروح فين
+    return const Scaffold(backgroundColor: Colors.white);
   }
 }

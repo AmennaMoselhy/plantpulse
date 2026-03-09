@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'change_password_sheet.dart';
@@ -66,15 +67,13 @@ class _ProfileState extends State<Profile> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) {
-        return _EditProfileSheet(
-          fullName: _displayName,
-          onSave: (newName) {
-            setState(() => _displayName = newName);
-            widget.onNameChanged?.call(newName);
-          },
-        );
-      },
+      builder: (context) => _EditProfileSheet(
+        fullName: _displayName,
+        onSave: (newName) {
+          setState(() => _displayName = newName);
+          widget.onNameChanged?.call(newName);
+        },
+      ),
     );
   }
 
@@ -131,8 +130,6 @@ class _ProfileState extends State<Profile> {
                 ],
               ),
               const SizedBox(height: 24),
-
-              // ✅ صورة البروفايل الكبيرة مع إمكانية التغيير
               Stack(
                 children: [
                   ClipOval(
@@ -199,20 +196,18 @@ class _ProfileState extends State<Profile> {
                 icon: "logout",
                 label: 'Logout',
                 isLogout: true,
-                onTap: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    useSafeArea: true,
-                    backgroundColor: Colors.white,
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(24),
-                      ),
+                onTap: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  useSafeArea: true,
+                  backgroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(24),
                     ),
-                    builder: (context) => const LogoutSheet(),
-                  );
-                },
+                  ),
+                  builder: (context) => const LogoutSheet(),
+                ),
               ),
             ],
           ),
@@ -356,11 +351,17 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
 
+  static final _emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$');
+
+  // ✅ لتلوين الـ border لما يكون فيه error
+  bool _nameError = false;
+  bool _emailError = false;
+
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.fullName);
-    _emailController = TextEditingController();
+    _emailController = TextEditingController(text: userState.email);
   }
 
   @override
@@ -368,6 +369,47 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     _nameController.dispose();
     _emailController.dispose();
     super.dispose();
+  }
+
+  void _handleSave() {
+    final newName = _nameController.text.trim();
+    final newEmail = _emailController.text.trim();
+
+    bool hasError = false;
+
+    // ✅ validation الاسم
+    if (newName.length < 5) {
+      setState(() => _nameError = true);
+      hasError = true;
+    } else {
+      setState(() => _nameError = false);
+    }
+
+    // ✅ validation الإيميل
+    if (newEmail.isNotEmpty && !_emailRegex.hasMatch(newEmail)) {
+      setState(() => _emailError = true);
+      hasError = true;
+    } else {
+      setState(() => _emailError = false);
+    }
+
+    if (hasError) return;
+
+    // ✅ حفظ البيانات
+    widget.onSave(newName);
+    if (newEmail.isNotEmpty) userState.updateEmail(newEmail);
+
+    Navigator.pop(context);
+
+    // ✅ toast نجاح
+    Fluttertoast.showToast(
+      msg: "Profile updated successfully",
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.CENTER,
+      backgroundColor: const Color(0xFF399B25),
+      textColor: Colors.white,
+      fontSize: 14,
+    );
   }
 
   @override
@@ -392,7 +434,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               ),
             ),
             const SizedBox(height: 24),
-            // ✅ الصورة في الـ sheet بتاتع edit profile بتتغير هي كمان
             Stack(
               children: [
                 ClipOval(
@@ -430,23 +471,26 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               ],
             ),
             const SizedBox(height: 24),
-            _buildEditField(label: 'Name', controller: _nameController),
+            _buildEditField(
+              label: 'Name',
+              controller: _nameController,
+              hasError: _nameError,
+              errorText: 'Name must be at least 5 characters',
+            ),
             const SizedBox(height: 16),
             _buildEditField(
               label: 'Email',
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
+              hasError: _emailError,
+              errorText: 'Enter a valid email',
             ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: () {
-                  final newName = _nameController.text.trim();
-                  if (newName.isNotEmpty) widget.onSave(newName);
-                  Navigator.pop(context);
-                },
+                onPressed: _handleSave,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF399B25),
                   elevation: 0,
@@ -475,6 +519,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   Widget _buildEditField({
     required String label,
     required TextEditingController controller,
+    required bool hasError,
+    required String errorText,
     TextInputType keyboardType = TextInputType.text,
   }) {
     return Column(
@@ -518,26 +564,44 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               color: Color(0xFF399B25),
               size: 20,
             ),
+            // ✅ border أحمر لما يكون فيه error
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFFCCCCCC),
-                width: 0.6,
+              borderSide: BorderSide(
+                color: hasError
+                    ? const Color(0xFFD32F2F)
+                    : const Color(0xFFCCCCCC),
+                width: hasError ? 1.0 : 0.6,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: Color(0xFF399B25),
+              borderSide: BorderSide(
+                color: hasError
+                    ? const Color(0xFFD32F2F)
+                    : const Color(0xFF399B25),
                 width: 1.5,
               ),
             ),
+            // ✅ error text
+            errorText: hasError ? errorText : null,
+            errorStyle: const TextStyle(
+              fontSize: 11,
+              fontFamily: 'Poppins',
+              color: Color(0xFFD32F2F),
+            ),
           ),
-          onTap: () {
-            controller.selection = TextSelection(
-              baseOffset: 0,
-              extentOffset: controller.text.length,
-            );
+          onTap: () => controller.selection = TextSelection(
+            baseOffset: 0,
+            extentOffset: controller.text.length,
+          ),
+          onChanged: (_) {
+            // ✅ يشيل الـ error لما يبدأ يكتب
+            if (hasError)
+              setState(() {
+                if (label == 'Name') _nameError = false;
+                if (label == 'Email') _emailError = false;
+              });
           },
         ),
       ],
