@@ -1,47 +1,75 @@
 import 'package:flutter/material.dart';
 import 'package:introduction_screen/introduction_screen.dart';
-import 'login.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'login.dart';
 
 class OnBoardingScreen extends StatefulWidget {
+  const OnBoardingScreen({super.key});
+
   @override
   State<OnBoardingScreen> createState() => _OnBoardingScreenState();
 }
 
 class _OnBoardingScreenState extends State<OnBoardingScreen> {
-  final introKey = GlobalKey<IntroductionScreenState>();
-  int currentPage = 0;
+  late List<PageViewModel> _pages;
+  final _introKey = GlobalKey<IntroductionScreenState>();
+  int _currentPage = 0;
+
+  // ✅ static عشان متتعملش كل build
+  static const _pageData = [
+    (
+      title: "Welcome to PlantPulse!",
+      body:
+          "Discover, track, and care for your plants easily. Your personal plant companion for a greener life.",
+      image: "assets/onboarding1.png",
+    ),
+    (
+      title: "Get Expert Tips",
+      body: "Receive daily advice and tips to make your plants thrive",
+      image: "assets/onboarding2.png",
+    ),
+    (
+      title: "Care for Your Plants",
+      body:
+          "Learn how to water, fertilize, and help your plants grow healthy and strong",
+      image: "assets/onboarding3.png",
+    ),
+  ];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final size = MediaQuery.of(context).size;
+    _pages = _pageData
+        .map(
+          (data) =>
+              _buildPage(context, size, data.title, data.body, data.image),
+        )
+        .toList();
+  }
+
+  Future<void> _navigateToLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('seen', true);
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const Login()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      Page_view_model().PageView(
-        context,
-        "Welcome to PlantPulse!",
-        "Discover, track, and care for your plants easily. Your personal plant companion for a greener life.",
-        1,
-      ),
-      Page_view_model().PageView(
-        context,
-        "Get Expert Tips",
-        "Receive daily advice and tips to make your plants thrive",
-        2,
-      ),
-      Page_view_model().PageView(
-        context,
-        "Care for Your Plants",
-        "Learn how to water, fertilize, and help your plants grow healthy and strong",
-        3,
-      ),
-    ];
     final size = MediaQuery.of(context).size;
+    final isLastPage = _currentPage == _pageData.length - 1;
+
     return Scaffold(
       body: Stack(
         children: [
           IntroductionScreen(
-            key: introKey,
-            globalBackgroundColor: const Color(0xFFFFFFFF),
-            pages: pages,
+            key: _introKey,
+            globalBackgroundColor: Colors.white,
+            pages: _pages,
             showSkipButton: false,
             showNextButton: false,
             showDoneButton: false,
@@ -49,105 +77,76 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
               size: Size(0, 0),
               activeSize: Size(0, 0),
             ),
-            onChange: (index) {
-              setState(() {
-                currentPage = index;
-              });
-            },
+            onChange: (index) => setState(() => _currentPage = index),
           ),
-          Container(
-            padding: EdgeInsets.only(
-              top: size.height * 0.084,
-              right: size.width * 0.064,
-              left: size.width * 0.064,
-            ),
+
+          // ✅ Top bar: back + skip
+          Positioned(
+            top: size.height * 0.084,
+            left: size.width * 0.064,
+            right: size.width * 0.064,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
               children: [
-                if (currentPage != 0)
-                  Positioned(
-                    top: size.height * 0.086,
-                    left: size.width * 0.064,
-                    right: size.width * 0.064,
-                    child: GestureDetector(
-                      onTap: () {
-                        introKey.currentState?.previous();
-                      },
-                      child: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: const Color(0xFF4A4A4A),
-                        size: 24,
-                      ),
+                if (_currentPage != 0)
+                  GestureDetector(
+                    onTap: () => _introKey.currentState?.previous(),
+                    child: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: Color(0xFF4A4A4A),
+                      size: 24,
                     ),
                   ),
-                Spacer(),
-                Positioned(
-                  top: size.height * 0.086,
-                  left: size.width * 0.064,
-                  right: size.width * 0.064,
-                  child: ElevatedButton(
-                    style: ButtonStyle(
-                      elevation: MaterialStateProperty.all(0),
-                      backgroundColor: MaterialStateProperty.all(
-                        const Color(0xFFEDEDED),
-                      ),
-                      minimumSize: MaterialStateProperty.all(
-                        Size(size.width * 0.064, size.height * 0.0345),
-                      ),
-                      padding: MaterialStateProperty.all(
-                        EdgeInsets.symmetric(
-                          vertical: size.height * 0.0023,
-                          horizontal: size.width * 0.0567,
-                        ),
-                      ),
+                const Spacer(),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    backgroundColor: const Color(0xFFEDEDED),
+                    minimumSize: Size(size.width * 0.064, size.height * 0.0345),
+                    padding: EdgeInsets.symmetric(
+                      vertical: size.height * 0.0023,
+                      horizontal: size.width * 0.0567,
                     ),
-                    onPressed: () async {
-                      SharedPreferences prefs =
-                          await SharedPreferences.getInstance();
-                      await prefs.setBool('seen', true);
-
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => Login()),
-                      );
-                    },
-                    child: const Text(
-                      "Skip",
-                      style: const TextStyle(
-                        color: const Color(0xFF4A4A4A),
-                        fontWeight: FontWeight.w500,
-                        fontSize: 12,
-                      ),
+                  ),
+                  onPressed: _navigateToLogin,
+                  child: const Text(
+                    "Skip",
+                    style: TextStyle(
+                      color: Color(0xFF4A4A4A),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
                     ),
                   ),
                 ),
               ],
             ),
           ),
+
+          // ✅ Dots
           Positioned(
             bottom: size.height * 0.197,
             left: 0,
             right: 0,
-            child: Center(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  pages.length,
-                  (index) => Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: currentPage == index ? 18 : 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: currentPage == index
-                          ? const Color(0xFF399B25)
-                          : const Color(0xFFC7C7C7),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                _pages.length,
+                (index) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: _currentPage == index ? 18 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _currentPage == index
+                        ? const Color(0xFF399B25)
+                        : const Color(0xFFC7C7C7),
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
               ),
             ),
           ),
+
+          // ✅ Next / Get Started button
           Positioned(
             bottom: size.height * 0.111,
             left: size.width * 0.064,
@@ -162,22 +161,11 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                onPressed: () async {
-                  if (currentPage == pages.length - 1) {
-                    SharedPreferences prefs =
-                        await SharedPreferences.getInstance();
-                    await prefs.setBool('seen', true);
-
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (_) => Login()),
-                    );
-                  } else {
-                    introKey.currentState?.next();
-                  }
-                },
+                onPressed: isLastPage
+                    ? _navigateToLogin
+                    : () => _introKey.currentState?.next(),
                 child: Text(
-                  currentPage == pages.length - 1 ? "Get Started" : "Next",
+                  isLastPage ? "Get Started" : "Next",
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -192,32 +180,28 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
       ),
     );
   }
-}
 
-class Page_view_model {
-  PageViewModel PageView(
+  // ✅ extracted method بدل class منفصل
+  PageViewModel _buildPage(
     BuildContext context,
+    Size size,
     String title,
     String body,
-    int page_number,
+    String imagePath,
   ) {
-    final size = MediaQuery.of(context).size;
     return PageViewModel(
       title: title,
       body: body,
-      image: Image.asset(
-        "assets/onboarding$page_number.png",
-        height: size.height * 0.3239,
-      ),
+      image: Image.asset(imagePath, height: size.height * 0.3239),
       decoration: PageDecoration(
         titleTextStyle: const TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w700,
-          color: const Color(0xFF399B25),
+          color: Color(0xFF399B25),
         ),
         bodyTextStyle: const TextStyle(
           fontSize: 16,
-          color: const Color(0xFF6E6E6E),
+          color: Color(0xFF6E6E6E),
           fontWeight: FontWeight.w400,
         ),
         imagePadding: EdgeInsets.only(

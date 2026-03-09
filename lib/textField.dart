@@ -11,6 +11,7 @@ class Textfield extends StatefulWidget {
   final bool enabled;
 
   const Textfield({
+    super.key,
     required this.title,
     required this.hint_text,
     this.isPassword = false,
@@ -26,7 +27,7 @@ class Textfield extends StatefulWidget {
 }
 
 class _TextfieldState extends State<Textfield> {
-  bool password_hidden = true;
+  bool _passwordHidden = true;
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +40,7 @@ class _TextfieldState extends State<Textfield> {
             color: Color(0xFF222222),
             fontWeight: FontWeight.w500,
             fontSize: 14,
+            fontFamily: 'Poppins',
           ),
         ),
         const SizedBox(height: 8),
@@ -46,52 +48,59 @@ class _TextfieldState extends State<Textfield> {
           controller: widget.controller,
           validator: widget.validator,
           enabled: widget.enabled,
-          obscureText: widget.isPassword ? password_hidden : false,
+          obscureText: widget.isPassword && _passwordHidden,
           keyboardType: widget.keyboardType,
           maxLines: widget.maxLines,
           textInputAction: TextInputAction.next,
           enableSuggestions: !widget.isPassword,
           autocorrect: !widget.isPassword,
-          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+          // ✅ أسرع من onTapOutside
+          onTapOutside: (_) => FocusScope.of(context).unfocus(),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            color: Color(0xFF1F1F1F),
+            fontFamily: 'Poppins',
+          ),
           decoration: InputDecoration(
             hintText: widget.hint_text,
             hintStyle: const TextStyle(
               color: Color(0xFF676767),
               fontSize: 14,
               fontWeight: FontWeight.w400,
+              fontFamily: 'Poppins',
+            ),
+            // ✅ error style
+            errorStyle: const TextStyle(
+              fontSize: 11,
+              fontFamily: 'Poppins',
+              color: Color(0xFFD32F2F),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                width: 0.6,
-                color: Color(0xFFCCCCCC),
-              ),
+              borderSide: const BorderSide(width: 0.6, color: Color(0xFFCCCCCC)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                width: 1.5,
-                color: Color(0xFF399B25),
-              ),
+              borderSide: const BorderSide(width: 1.5, color: Color(0xFF399B25)),
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 14,
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(width: 1, color: Color(0xFFD32F2F)),
             ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(width: 1.5, color: Color(0xFFD32F2F)),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             suffixIcon: widget.isPassword
                 ? IconButton(
               icon: Icon(
-                password_hidden
-                    ? Icons.visibility_off_outlined
-                    : Icons.remove_red_eye_outlined,
+                _passwordHidden ? Icons.visibility_off_outlined : Icons.remove_red_eye_outlined,
                 color: const Color(0xFF676767),
                 size: 24,
               ),
-              onPressed: () {
-                setState(() {
-                  password_hidden = !password_hidden;
-                });
-              },
+              onPressed: () => setState(() => _passwordHidden = !_passwordHidden),
             )
                 : null,
             filled: true,
