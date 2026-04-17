@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'greenButton.dart';
 import 'dart:math';
 import 'recentScan.dart';
+import 'resultscan.dart';
 
 class ScanProcessing extends StatefulWidget {
   final String imagePath;
@@ -388,10 +389,11 @@ class _ScanProcessingState extends State<ScanProcessing>
         GreenButton(
           text: "See Result",
           onPress: () {
+            String status;
             if (!_resultSaved) {
               _resultSaved = true;
               final random = Random();
-              final status = random.nextBool() ? 'Healthy' : 'Diseased';
+              status = random.nextBool() ? 'Healthy' : 'Diseased';
               recentScans.add(
                 ScanRecord(
                   imagePath: widget.imagePath,
@@ -400,10 +402,22 @@ class _ScanProcessingState extends State<ScanProcessing>
                   scanTime: DateTime.now(),
                 ),
               );
+            } else {
+              status = recentScans.last.status;
             }
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ResultPage(
+                  imagePath: widget.imagePath,
+                  plantName: 'Lettuce type',
+                  status: status,
+                ),
+              ),
+            );
           },
         ),
       ],
     );
-  }
-}
+  }}

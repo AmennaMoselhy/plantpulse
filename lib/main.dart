@@ -36,7 +36,6 @@ class MyApp extends StatelessWidget {
         'ScanPage': (context) => const Scan(),
         'RecentScan': (context) => const RecentScan(),
         'ResultPage': (context) => const ResultPage(imagePath: '', plantName: 'Lettuce', status: 'Healthy'),
-
       },
     );
   }
