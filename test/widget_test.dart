@@ -3,7 +3,7 @@ import 'package:PlantPulse/main.dart';
 
 void main() {
   testWidgets('App loads', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp(seen: false));
+    await tester.pumpWidget(const MyApp());
     expect(find.byType(MyApp), findsOneWidget);
   });
 }

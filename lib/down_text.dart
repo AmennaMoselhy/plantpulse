@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 
 class DownText extends StatelessWidget {
-  final String text1;
-  final String text2;
-  final VoidCallback fun;
+  final String label;
+  final String actionText;
+  final VoidCallback onTap;
 
-  const DownText({required this.text1, required this.text2, required this.fun});
+  const DownText({
+    super.key,
+    required this.label,
+    required this.actionText,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -13,23 +18,25 @@ class DownText extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          "$text1 ",
+          '$label ',
           style: const TextStyle(
-            color: const Color(0xFF6E6E6E),
+            color: Color(0xFF6E6E6E),
             fontWeight: FontWeight.w400,
             fontSize: 14,
+            fontFamily: 'Poppins',
           ),
         ),
         GestureDetector(
-          onTap: fun,
+          onTap: onTap,
           child: Text(
-            text2,
+            actionText,
             style: const TextStyle(
               fontWeight: FontWeight.w400,
               fontSize: 14,
-              color: const Color(0xFF399B25),
+              color: Color(0xFF399B25),
+              fontFamily: 'Poppins',
               decoration: TextDecoration.underline,
-              decorationColor: const Color(0xFF399B25),
+              decorationColor: Color(0xFF399B25),
             ),
           ),
         ),

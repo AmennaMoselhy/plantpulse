@@ -15,13 +15,14 @@ class _ScanState extends State<Scan> {
   final ImagePicker _picker = ImagePicker();
 
   Future<void> _pickImage(ImageSource source) async {
-    final XFile? image = await _picker.pickImage(source: source);
-    if (image != null && mounted) {
-      final bytes = await image.readAsBytes();
+    try {
+      final XFile? image = await _picker.pickImage(source: source);
+      if (image == null || !mounted) return;
+
       final tempDir = await getTemporaryDirectory();
       final String newPath =
           '${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await File(newPath).writeAsBytes(bytes);
+      await File(image.path).copy(newPath);
 
       if (!mounted) return;
       Navigator.push(
@@ -30,11 +31,20 @@ class _ScanState extends State<Scan> {
           builder: (context) => ScanProcessing(imagePath: newPath),
         ),
       );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not access image. Please check permissions.'),
+          backgroundColor: Color(0xFFD32F2F),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -68,15 +78,15 @@ class _ScanState extends State<Scan> {
               const SizedBox(height: 32),
               Center(
                 child: SizedBox(
-                  width: 220,
-                  height: 220,
+                  width: size.width * 0.56,
+                  height: size.width * 0.56,
                   child: Stack(
                     children: [
                       Center(
                         child: Image.asset(
                           "assets/lettuce.png",
-                          height: 161,
-                          width: 151,
+                          height: size.width * 0.41,
+                          width: size.width * 0.38,
                         ),
                       ),
                       Center(child: Image.asset("assets/border.png")),
@@ -85,79 +95,71 @@ class _ScanState extends State<Scan> {
                 ),
               ),
               const Spacer(),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () => _pickImage(ImageSource.camera),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0XFF399B25),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'Start Scan',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          fontFamily: 'Poppins',
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Image.asset(
-                        "assets/qrcode.png",
-                        height: 24,
-                        width: 24,
-                      ),
-                    ],
-                  ),
-                ),
+              _buildButton(
+                label: 'Start Scan',
+                icon: Image.asset("assets/qrcode.png", height: 24, width: 24),
+                onPressed: () => _pickImage(ImageSource.camera),
+                backgroundColor: const Color(0XFF399B25),
+                textColor: Colors.white,
+                isOutlined: false,
               ),
               const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () => _pickImage(ImageSource.gallery),
-                  style: ElevatedButton.styleFrom(
-                    elevation: 0,
-                    backgroundColor: const Color(0XFFFFFFFF),
-                    side: const BorderSide(
-                      color: Color(0xFF399B25),
-                      width: 0.6,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'Upload From Gallery',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          fontFamily: 'Poppins',
-                          color: Color(0xFF399B25),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      const Icon(
-                          Icons.image, size: 24, color: Color(0xFF399B25)),
-                    ],
-                  ),
+              _buildButton(
+                label: 'Upload From Gallery',
+                icon: const Icon(
+                  Icons.image,
+                  size: 24,
+                  color: Color(0xFF399B25),
                 ),
+                onPressed: () => _pickImage(ImageSource.gallery),
+                backgroundColor: Colors.white,
+                textColor: const Color(0xFF399B25),
+                isOutlined: true,
               ),
               const SizedBox(height: 24),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildButton({
+    required String label,
+    required Widget icon,
+    required VoidCallback onPressed,
+    required Color backgroundColor,
+    required Color textColor,
+    required bool isOutlined,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          backgroundColor: backgroundColor,
+          side: isOutlined
+              ? const BorderSide(color: Color(0xFF399B25), width: 0.6)
+              : BorderSide.none,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                fontFamily: 'Poppins',
+                color: textColor,
+              ),
+            ),
+            const SizedBox(width: 10),
+            icon,
+          ],
         ),
       ),
     );

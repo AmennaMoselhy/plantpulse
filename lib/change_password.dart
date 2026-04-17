@@ -1,23 +1,33 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'green_button.dart';
+import 'up_green_plant_pulse.dart';
 import 'user_state.dart';
 
-class ResetPasswordSheet extends StatefulWidget {
-  const ResetPasswordSheet({super.key});
+class ChangePassword extends StatefulWidget {
+  const ChangePassword({super.key});
 
   @override
-  State<ResetPasswordSheet> createState() => _ResetPasswordSheetState();
+  State<ChangePassword> createState() => _ChangePasswordState();
 }
 
-class _ResetPasswordSheetState extends State<ResetPasswordSheet> {
+class _ChangePasswordState extends State<ChangePassword> {
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
 
+  String _email = '';
+
   bool _passwordsMatch = false;
   String? _newPasswordError;
   String? _confirmError;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = ModalRoute.of(context)?.settings.arguments as Map?;
+    _email = args?['email'] as String? ?? userState.email;
+  }
 
   static const _resetUrl =
       'https://plant-pules-api.vercel.app/api/v1/password/reset-password';
@@ -61,10 +71,7 @@ class _ResetPasswordSheetState extends State<ResetPasswordSheet> {
       final dio = Dio();
       await dio.post(
         _resetUrl,
-        data: {
-          'email': userState.email,
-          'newPassword': _newPasswordController.text,
-        },
+        data: {'email': _email, 'newPassword': _newPasswordController.text},
         options: Options(
           receiveTimeout: const Duration(seconds: 15),
           sendTimeout: const Duration(seconds: 15),
@@ -74,19 +81,7 @@ class _ResetPasswordSheetState extends State<ResetPasswordSheet> {
       userState.updatePassword(_newPasswordController.text);
 
       if (!mounted) return;
-
-      Fluttertoast.showToast(
-        msg: 'Password changed successfully',
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.CENTER,
-        backgroundColor: const Color(0xFF399B25),
-        textColor: Colors.white,
-        fontSize: 14,
-      );
-
-      Navigator.of(
-        context,
-      ).popUntil((route) => route.isFirst || route.settings.name == 'HomePage');
+      _showSuccessDialog();
     } on DioException catch (e) {
       final msg = e.response?.data?['message'] ?? 'Failed to reset password';
       _showError(msg);
@@ -112,109 +107,143 @@ class _ResetPasswordSheetState extends State<ResetPasswordSheet> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final mq = MediaQuery.of(context);
-    return Padding(
-      padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
-      child: SingleChildScrollView(
+  void _showSuccessDialog() {
+    final size = MediaQuery.of(context).size;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: EdgeInsets.symmetric(
+            horizontal: size.width * 0.053,
+            vertical: size.height * 0.0296,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD9D9D9),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
+              Image.asset(
+                'assets/right.png',
+                cacheWidth: 100,
+                width: size.width * 0.1,
+                height: size.height * 0.0462,
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: size.height * 0.0197),
               const Text(
-                'Reset Password',
+                'Password Changed Successfully!',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
                   color: Color(0xFF1F1F1F),
-                  fontFamily: 'Poppins',
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Create a new password that is strong and secure',
-                style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF717171),
+                  fontWeight: FontWeight.w600,
                   fontFamily: 'Poppins',
                 ),
               ),
-              const SizedBox(height: 24),
-              _PasswordField(
-                label: 'New Password',
-                hint: 'Enter Your New Password',
-                controller: _newPasswordController,
-                onChanged: _onNewPasswordChanged,
-                errorText: _newPasswordError,
+              SizedBox(height: size.height * 0.0099),
+              const Text(
+                'You Can Now Use Your New Password To Log In',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF4A4A4A),
+                  fontSize: 14,
+                  fontFamily: 'Poppins',
+                ),
               ),
-              const SizedBox(height: 16),
-              _PasswordField(
-                label: 'Confirm New Password',
-                hint: 'Re-enter your new password',
-                controller: _confirmPasswordController,
-                onChanged: _onConfirmChanged,
-                errorText: _confirmError,
-              ),
-              const SizedBox(height: 24),
+              SizedBox(height: size.height * 0.0394),
               SizedBox(
                 width: double.infinity,
-                height: mq.size.height * 0.0592,
                 child: ElevatedButton(
-                  onPressed: _passwordsMatch && !_isLoading
-                      ? _handleConfirm
-                      : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _passwordsMatch && !_isLoading
-                        ? const Color(0xFF399B25)
-                        : const Color(0xFFBABABA),
-                    disabledBackgroundColor: const Color(0xFFBABABA),
-                    elevation: 0,
+                    backgroundColor: const Color(0xFF399B25),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Text(
-                          'Confirm Change',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            fontFamily: 'Poppins',
-                          ),
-                        ),
+                  onPressed: () => Navigator.of(
+                    context,
+                  ).pushNamedAndRemoveUntil('Login', (route) => false),
+                  child: const Text(
+                    'Go Back',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 60),
             ],
           ),
         ),
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: true,
+      body: ListView(
+        padding: EdgeInsets.zero,
+        physics: const BouncingScrollPhysics(),
+        children: [
+          const UpGreenPlantPulse(),
+          SizedBox(height: size.height * 0.0296),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: size.width * 0.064),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Change Password',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF399B25),
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                SizedBox(height: size.height * 0.0296),
+                _PasswordField(
+                  label: 'New Password',
+                  hint: 'Enter Your New Password',
+                  controller: _newPasswordController,
+                  onChanged: _onNewPasswordChanged,
+                  errorText: _newPasswordError,
+                ),
+                SizedBox(height: size.height * 0.0197),
+                _PasswordField(
+                  label: 'Confirm New Password',
+                  hint: 'Re-enter Your New Password',
+                  controller: _confirmPasswordController,
+                  onChanged: _onConfirmChanged,
+                  errorText: _confirmError,
+                ),
+                SizedBox(height: size.height * 0.0591),
+                _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF399B25),
+                        ),
+                      )
+                    : GreenButton(
+                        text: 'Confirm Change',
+                        onPress: _handleConfirm,
+                        isDisabled: !_passwordsMatch,
+                      ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
 
 class _PasswordField extends StatefulWidget {
   final String label;
@@ -248,7 +277,7 @@ class _PasswordFieldState extends State<_PasswordField> {
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: Color(0xFF1F1F1F),
+            color: Color(0xFF222222),
             fontFamily: 'Poppins',
           ),
         ),

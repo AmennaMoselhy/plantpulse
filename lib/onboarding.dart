@@ -11,41 +11,39 @@ class OnBoardingScreen extends StatefulWidget {
 }
 
 class _OnBoardingScreenState extends State<OnBoardingScreen> {
-  late List<PageViewModel> _pages;
   final _introKey = GlobalKey<IntroductionScreenState>();
   int _currentPage = 0;
+  List<PageViewModel>? _pages;
 
-  // ✅ static عشان متتعملش كل build
   static const _pageData = [
     (
-      title: "Welcome to PlantPulse!",
+      title: 'Welcome to PlantPulse!',
       body:
-          "Discover, track, and care for your plants easily. Your personal plant companion for a greener life.",
-      image: "assets/onboarding1.png",
+          'Discover, track, and care for your plants easily. Your personal plant companion for a greener life.',
+      image: 'assets/onboarding1.png',
     ),
     (
-      title: "Get Expert Tips",
-      body: "Receive daily advice and tips to make your plants thrive",
-      image: "assets/onboarding2.png",
+      title: 'Get Expert Tips',
+      body: 'Receive daily advice and tips to make your plants thrive',
+      image: 'assets/onboarding2.png',
     ),
     (
-      title: "Care for Your Plants",
+      title: 'Care for Your Plants',
       body:
-          "Learn how to water, fertilize, and help your plants grow healthy and strong",
-      image: "assets/onboarding3.png",
+          'Learn how to water, fertilize, and help your plants grow healthy and strong',
+      image: 'assets/onboarding3.png',
     ),
   ];
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final size = MediaQuery.of(context).size;
-    _pages = _pageData
-        .map(
-          (data) =>
-              _buildPage(context, size, data.title, data.body, data.image),
-        )
-        .toList();
+    if (_pages == null) {
+      final size = MediaQuery.of(context).size;
+      _pages = _pageData
+          .map((d) => _buildPage(size, d.title, d.body, d.image))
+          .toList();
+    }
   }
 
   Future<void> _navigateToLogin() async {
@@ -61,6 +59,9 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final pages = _pages;
+    if (pages == null) return const SizedBox.shrink();
+
     final isLastPage = _currentPage == _pageData.length - 1;
 
     return Scaffold(
@@ -69,7 +70,7 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
           IntroductionScreen(
             key: _introKey,
             globalBackgroundColor: Colors.white,
-            pages: _pages,
+            pages: pages,
             showSkipButton: false,
             showNextButton: false,
             showDoneButton: false,
@@ -80,7 +81,7 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
             onChange: (index) => setState(() => _currentPage = index),
           ),
 
-          // ✅ Top bar: back + skip
+          // Top bar
           Positioned(
             top: size.height * 0.084,
             left: size.width * 0.064,
@@ -109,11 +110,12 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
                   ),
                   onPressed: _navigateToLogin,
                   child: const Text(
-                    "Skip",
+                    'Skip',
                     style: TextStyle(
                       color: Color(0xFF4A4A4A),
                       fontWeight: FontWeight.w500,
                       fontSize: 12,
+                      fontFamily: 'Poppins',
                     ),
                   ),
                 ),
@@ -121,7 +123,7 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
             ),
           ),
 
-          // ✅ Dots
+          // Dots
           Positioned(
             bottom: size.height * 0.197,
             left: 0,
@@ -129,7 +131,7 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
-                _pages.length,
+                pages.length,
                 (index) => AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -146,7 +148,6 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
             ),
           ),
 
-          // ✅ Next / Get Started button
           Positioned(
             bottom: size.height * 0.111,
             left: size.width * 0.064,
@@ -165,7 +166,7 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
                     ? _navigateToLogin
                     : () => _introKey.currentState?.next(),
                 child: Text(
-                  isLastPage ? "Get Started" : "Next",
+                  isLastPage ? 'Get Started' : 'Next',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -181,9 +182,7 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
     );
   }
 
-  // ✅ extracted method بدل class منفصل
   PageViewModel _buildPage(
-    BuildContext context,
     Size size,
     String title,
     String body,
@@ -192,17 +191,23 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
     return PageViewModel(
       title: title,
       body: body,
-      image: Image.asset(imagePath, height: size.height * 0.3239),
+      image: Image.asset(
+        imagePath,
+        height: size.height * 0.3239,
+        cacheHeight: (size.height * 0.3239).toInt(),
+      ),
       decoration: PageDecoration(
         titleTextStyle: const TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w700,
           color: Color(0xFF399B25),
+          fontFamily: 'Poppins',
         ),
         bodyTextStyle: const TextStyle(
           fontSize: 16,
           color: Color(0xFF6E6E6E),
           fontWeight: FontWeight.w400,
+          fontFamily: 'Poppins',
         ),
         imagePadding: EdgeInsets.only(
           top: size.height * 0.138,
@@ -215,10 +220,7 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
           left: size.width * 0.064,
           bottom: size.height * 0.0099,
         ),
-        bodyPadding: EdgeInsets.only(
-          right: size.width * 0.064,
-          left: size.width * 0.064,
-        ),
+        bodyPadding: EdgeInsets.symmetric(horizontal: size.width * 0.064),
       ),
     );
   }

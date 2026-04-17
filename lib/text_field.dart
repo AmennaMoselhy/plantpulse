@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class Textfield extends StatefulWidget {
   final String title;
-  final String hint_text;
+  final String hintText;
   final bool isPassword;
   final TextInputType? keyboardType;
   final int? maxLines;
@@ -13,7 +13,7 @@ class Textfield extends StatefulWidget {
   const Textfield({
     super.key,
     required this.title,
-    required this.hint_text,
+    required this.hintText,
     this.isPassword = false,
     this.keyboardType,
     this.maxLines = 1,
@@ -50,11 +50,10 @@ class _TextfieldState extends State<Textfield> {
           enabled: widget.enabled,
           obscureText: widget.isPassword && _passwordHidden,
           keyboardType: widget.keyboardType,
-          maxLines: widget.maxLines,
+          maxLines: widget.isPassword ? 1 : widget.maxLines,
           textInputAction: TextInputAction.next,
           enableSuggestions: !widget.isPassword,
           autocorrect: !widget.isPassword,
-          // ✅ أسرع من onTapOutside
           onTapOutside: (_) => FocusScope.of(context).unfocus(),
           style: const TextStyle(
             fontSize: 14,
@@ -63,14 +62,13 @@ class _TextfieldState extends State<Textfield> {
             fontFamily: 'Poppins',
           ),
           decoration: InputDecoration(
-            hintText: widget.hint_text,
+            hintText: widget.hintText,
             hintStyle: const TextStyle(
               color: Color(0xFF676767),
               fontSize: 14,
               fontWeight: FontWeight.w400,
               fontFamily: 'Poppins',
             ),
-            // ✅ error style
             errorStyle: const TextStyle(
               fontSize: 11,
               fontFamily: 'Poppins',
@@ -96,7 +94,9 @@ class _TextfieldState extends State<Textfield> {
             suffixIcon: widget.isPassword
                 ? IconButton(
               icon: Icon(
-                _passwordHidden ? Icons.visibility_off_outlined : Icons.remove_red_eye_outlined,
+                _passwordHidden
+                    ? Icons.visibility_off_outlined
+                    : Icons.remove_red_eye_outlined,
                 color: const Color(0xFF676767),
                 size: 24,
               ),

@@ -1,9 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'upGreenPlantPulse.dart';
-import 'textField.dart';
-import 'greenButton.dart';
-import 'logWithFacebook.dart';
-import 'downText.dart';
+import 'up_green_plant_pulse.dart';
+import 'text_field.dart';
+import 'green_button.dart';
+import 'log_with_facebook.dart';
+import 'down_text.dart';
 import 'user_state.dart';
 
 class Register extends StatelessWidget {
@@ -18,10 +19,10 @@ class Register extends StatelessWidget {
         padding: EdgeInsets.zero,
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const BouncingScrollPhysics(),
-        children: [
+        children: const [
           UpGreenPlantPulse(),
-          const SizedBox(height: 20),
-          const _RegisterForm(),
+          SizedBox(height: 20),
+          _RegisterForm(),
         ],
       ),
     );
@@ -41,8 +42,12 @@ class _RegisterFormState extends State<_RegisterForm> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  String? _gender;
+  bool _isLoading = false;
 
   static final _emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$');
+  static const _signupUrl =
+      'https://plant-pules-api.vercel.app/api/v1/auth/signup';
 
   @override
   void dispose() {
@@ -77,27 +82,86 @@ class _RegisterFormState extends State<_RegisterForm> {
     return null;
   }
 
-  void _handleRegister() {
+  Future<void> _handleRegister() async {
     FocusScope.of(context).unfocus();
-    if (_formKey.currentState!.validate()) {
-      final firstName = _nameController.text.trim().split(' ')[0];
-      final fullName = _nameController.text.trim();
-      final email = _emailController.text.trim();
-      final password = _passwordController.text;
+    if (!_formKey.currentState!.validate()) return;
 
-      // ✅ حفظ البيانات في userState
-      userState.saveUserData(email: email, password: password);
+    setState(() => _isLoading = true);
 
-      Navigator.of(context).pushReplacementNamed(
+    final fullName = _nameController.text.trim();
+    final firstName = fullName.split(' ')[0];
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (_gender == null) {
+      _showError('Please select gender');
+      return;
+    }
+
+    try {
+      final dio = Dio();
+      final response = await dio.post(
+        _signupUrl,
+        data: {
+          'name': fullName,
+          'email': email,
+          'password': password,
+          'confirmPassword': password,
+        },
+        options: Options(
+          receiveTimeout: const Duration(seconds: 15),
+          sendTimeout: const Duration(seconds: 15),
+        ),
+      );
+
+      final token = response.data['token'] as String?;
+
+      if (token != null && token.isNotEmpty) {
+        await userState.saveToken(token);
+      }
+
+      userState.saveUserData(
+        email: email,
+        password: password,
+        fullName: fullName,
+        gender: _gender!,
+      );
+
+      if (!mounted) return;
+
+      Navigator.of(context).pushNamedAndRemoveUntil(
         'HomePage',
+        (route) => false,
         arguments: {
           'firstName': firstName,
           'fullName': fullName,
           'email': email,
-          'password': password,
+          'gender': _gender,
         },
       );
+    } on DioException catch (e) {
+      final msg = e.response?.data?['message'] ?? 'Registration failed';
+      _showError(msg);
+    } catch (_) {
+      _showError('Something went wrong. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          msg,
+          style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+        ),
+        backgroundColor: const Color(0xFFD32F2F),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
   }
 
   @override
@@ -114,40 +178,123 @@ class _RegisterFormState extends State<_RegisterForm> {
             Textfield(
               controller: _nameController,
               keyboardType: TextInputType.name,
-              title: "Name",
-              hint_text: "Enter Your Name",
+              title: 'Name',
+              hintText: 'Enter Your Name',
               validator: _validateName,
             ),
-            SizedBox(height: size.height * 0.015),
+            SizedBox(height: size.height * 0.005),
             Textfield(
-              title: "Email",
-              hint_text: "Enter Your Email",
+              title: 'Email',
+              hintText: 'Enter Your Email',
               keyboardType: TextInputType.emailAddress,
               controller: _emailController,
               validator: _validateEmail,
             ),
-            SizedBox(height: size.height * 0.015),
+            SizedBox(height: size.height * 0.005),
             Textfield(
-              title: "Password",
+              title: 'Password',
               controller: _passwordController,
-              hint_text: "Enter Your Password",
+              hintText: 'Enter Your Password',
               isPassword: true,
               keyboardType: TextInputType.visiblePassword,
               validator: _validatePassword,
             ),
-            SizedBox(height: size.height * 0.015),
+            SizedBox(height: size.height * 0.005),
             Textfield(
               controller: _confirmPasswordController,
-              title: "Confirm Password",
-              hint_text: "Enter Your Password",
+              title: 'Confirm Password',
+              hintText: 'Enter Your Password',
               isPassword: true,
               keyboardType: TextInputType.visiblePassword,
               validator: _validateConfirmPassword,
             ),
+            SizedBox(height: size.height * 0.01),
+
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _gender = 'male';
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _gender == 'male'
+                            ? const Color(0xFF399B25).withOpacity(0.1)
+                            : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _gender == 'male'
+                              ? const Color(0xFF399B25)
+                              : Colors.grey.shade300,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.male,
+                            size: 28,
+                            color: _gender == 'male'
+                                ? const Color(0xFF399B25)
+                                : Colors.grey,
+                          ),
+                          const SizedBox(height: 4),
+                          const Text('Male'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _gender = 'female';
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _gender == 'female'
+                            ? const Color(0xFF399B25).withOpacity(0.1)
+                            : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _gender == 'female'
+                              ? const Color(0xFF399B25)
+                              : Colors.grey.shade300,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.female,
+                            size: 28,
+                            color: _gender == 'female'
+                                ? const Color(0xFF399B25)
+                                : Colors.grey,
+                          ),
+                          const SizedBox(height: 4),
+                          const Text('Female'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: size.height * 0.01),
+
+            _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF399B25)),
+                  )
+                : GreenButton(text: 'Register', onPress: _handleRegister),
             SizedBox(height: size.height * 0.02),
-            GreenButton(text: 'Register', onPress: _handleRegister),
-            SizedBox(height: size.height * 0.02),
-            // ✅ لما يختار إيميل بيتحط في خانة الإيميل
             LoginWithFaceBook(
               onEmailSelected: (email) {
                 _emailController.text = email;
@@ -155,9 +302,9 @@ class _RegisterFormState extends State<_RegisterForm> {
             ),
             SizedBox(height: size.height * 0.015),
             DownText(
-              text1: "Have an account?",
-              text2: "Login",
-              fun: () => Navigator.of(context).pushNamed('Login'),
+              label: 'Have an account?',
+              actionText: 'Login',
+              onTap: () => Navigator.of(context).pushNamed('Login'),
             ),
             SizedBox(height: size.height * 0.03),
           ],

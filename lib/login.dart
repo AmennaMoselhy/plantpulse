@@ -1,10 +1,13 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'upGreenPlantPulse.dart';
-import 'textField.dart';
-import 'greenButton.dart';
-import 'downText.dart';
-import 'logWithFacebook.dart';
+import 'up_green_plant_pulse.dart';
+import 'text_field.dart';
+import 'green_button.dart';
+import 'down_text.dart';
+import 'log_with_facebook.dart';
 import 'user_state.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'recent_scan.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -17,9 +20,11 @@ class _LoginState extends State<Login> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isLoading = false;
 
-  // ✅ Regex ثابت — متتعملش كل مرة
   static final _emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$');
+  static const _signinUrl =
+      'https://plant-pules-api.vercel.app/api/v1/auth/signin';
 
   @override
   void dispose() {
@@ -42,22 +47,112 @@ class _LoginState extends State<Login> {
 
   Future<void> _handleLogin() async {
     FocusScope.of(context).unfocus();
-    if (_formKey.currentState!.validate()) {
-      userState.saveUserData(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    try {
+      await userState.loadPersistedData();
+
+      final savedEmail = userState.email;
+      final savedPassword = userState.password;
+
+      if (savedEmail == email &&
+          savedPassword == password &&
+          savedPassword.isNotEmpty) {
+        if (!mounted) return;
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          'HomePage',
+          (route) => false,
+          arguments: {
+            'firstName': userState.fullName.isNotEmpty
+                ? userState.fullName.split(' ')[0]
+                : '',
+            'fullName': userState.fullName,
+            'email': email,
+            'password': password,
+          },
+        );
+        return;
+      }
+
+      final dio = Dio();
+      final response = await dio.post(
+        _signinUrl,
+        data: {'email': email, 'password': password},
+        options: Options(
+          receiveTimeout: const Duration(seconds: 15),
+          sendTimeout: const Duration(seconds: 15),
+        ),
       );
+
+      final token = response.data['token'] as String?;
+
+      if (token == null || token.isEmpty) {
+        _showError('Login failed. Please try again.');
+        return;
+      }
+
+      await userState.saveToken(token);
+
+      try {
+        final profileRes = await dio.get(
+          'https://plant-pules-api.vercel.app/api/v1/users/profile',
+          options: Options(headers: {'token': token}),
+        );
+        final name = profileRes.data['data']['name'] as String? ?? '';
+        final prefs = await SharedPreferences.getInstance();
+        final savedGender = prefs.getString('savedGender') ?? 'male';
+        userState.saveUserData(
+          email: email,
+          password: password,
+          fullName: name,
+          gender: savedGender,
+        );
+        await loadScansFromApi(token);
+      } catch (_) {
+        userState.saveUserData(email: email, password: password, fullName: '');
+      }
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(
+
+      Navigator.of(context).pushNamedAndRemoveUntil(
         'HomePage',
+        (route) => false,
         arguments: {
-          'firstName': '',
-          'fullName': '',
-          'email': _emailController.text.trim(),
-          'password': _passwordController.text,
+          'firstName': userState.fullName.isNotEmpty
+              ? userState.fullName.split(' ')[0]
+              : '',
+          'fullName': userState.fullName,
+          'email': email,
+          'password': password,
         },
       );
+    } on DioException catch (e) {
+      final msg = e.response?.data?['message'] ?? 'Invalid email or password';
+      _showError(msg);
+    } catch (_) {
+      _showError('Something went wrong. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          msg,
+          style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+        ),
+        backgroundColor: const Color(0xFFD32F2F),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
   }
 
   @override
@@ -74,7 +169,7 @@ class _LoginState extends State<Login> {
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           physics: const BouncingScrollPhysics(),
           children: [
-            UpGreenPlantPulse(),
+            const UpGreenPlantPulse(),
             SizedBox(height: size.height * 0.0355),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: size.width * 0.064),
@@ -84,16 +179,16 @@ class _LoginState extends State<Login> {
                   Textfield(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    title: "Email",
-                    hint_text: "Enter Your Email",
+                    title: 'Email',
+                    hintText: 'Enter Your Email',
                     validator: _validateEmail,
                   ),
                   SizedBox(height: size.height * 0.019),
                   Textfield(
                     controller: _passwordController,
                     keyboardType: TextInputType.visiblePassword,
-                    title: "Password",
-                    hint_text: "Enter Your Password",
+                    title: 'Password',
+                    hintText: 'Enter Your Password',
                     isPassword: true,
                     validator: _validatePassword,
                   ),
@@ -109,7 +204,7 @@ class _LoginState extends State<Login> {
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       child: const Text(
-                        "Forgot Password?",
+                        'Forgot Password?',
                         style: TextStyle(
                           fontWeight: FontWeight.w400,
                           fontFamily: 'Poppins',
@@ -120,7 +215,13 @@ class _LoginState extends State<Login> {
                     ),
                   ),
                   SizedBox(height: size.height * 0.0394),
-                  GreenButton(text: 'Log in', onPress: _handleLogin),
+                  _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF399B25),
+                          ),
+                        )
+                      : GreenButton(text: 'Log in', onPress: _handleLogin),
                   SizedBox(height: size.height * 0.0394),
                   LoginWithFaceBook(
                     onEmailSelected: (email) {
@@ -129,9 +230,9 @@ class _LoginState extends State<Login> {
                   ),
                   SizedBox(height: size.height * 0.1),
                   DownText(
-                    text1: "Don't have an account?",
-                    text2: "Register",
-                    fun: () => Navigator.of(context).pushNamed('Register'),
+                    label: "Don't have an account?",
+                    actionText: 'Register',
+                    onTap: () => Navigator.of(context).pushNamed('Register'),
                   ),
                   SizedBox(height: size.height * 0.03),
                 ],

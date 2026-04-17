@@ -1,10 +1,11 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'greenButton.dart';
-import 'dart:math';
-import 'recentScan.dart';
-import 'resultscan.dart';
+import 'green_button.dart';
+import 'recent_scan.dart';
+import 'resultpage.dart';
+import 'user_state.dart';
 
 class ScanProcessing extends StatefulWidget {
   final String imagePath;
@@ -23,19 +24,30 @@ class _ScanProcessingState extends State<ScanProcessing>
   late Animation<double> _lineAnimation;
   Timer? _progressTimer;
   bool _resultSaved = false;
+  String? _savedStatus;
   bool _imageLoadFailed = false;
   late Future<bool> _imageExistsFuture;
-
-  static const double _imgW = 151;
-  static const double _imgH = 141;
+  late double _imgW;
+  late double _imgH;
   static const double _borderOffset = 22;
+
+  String? _apiStatus;
+  String? _apiConfidence;
+  bool _apiDone = false;
+  String? _apiError;
+
+  static const _scanUrl =
+      'https://plant-pules-api.vercel.app/api/v1/scan/predict';
 
   @override
   void initState() {
     super.initState();
-
     _imageExistsFuture = File(widget.imagePath).exists();
+    _startAnimation();
+    _callScanApi();
+  }
 
+  void _startAnimation() {
     _lineController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -51,12 +63,68 @@ class _ScanProcessingState extends State<ScanProcessing>
         _progress += 0.014;
         if (_progress >= 1.0) {
           _progress = 1.0;
-          _scanComplete = true;
           _lineController.stop();
           timer.cancel();
+          _checkComplete();
         }
       });
     });
+  }
+
+  void _checkComplete() {
+    if (_progress >= 1.0 && _apiDone) {
+      if (mounted) setState(() => _scanComplete = true);
+    }
+  }
+
+  Future<void> _callScanApi() async {
+    try {
+      final dio = Dio();
+      final formData = FormData.fromMap({
+        'images': await MultipartFile.fromFile(
+          widget.imagePath,
+          filename: 'scan.jpg',
+        ),
+      });
+
+      final response = await dio.post(
+        _scanUrl,
+        data: formData,
+        options: Options(
+          headers: {'token': userState.token},
+          receiveTimeout: const Duration(seconds: 30),
+          sendTimeout: const Duration(seconds: 30),
+        ),
+      );
+
+      if (!mounted) return;
+
+      final data = response.data['data'];
+      final decision = (data?['finalDecision'] as String? ?? '').toLowerCase();
+      final confidence = (data?['averageConfidence'] as num? ?? 0)
+          .toStringAsFixed(0);
+
+      setState(() {
+        _apiStatus = decision == 'healthy' ? 'Healthy' : 'Diseased';
+        _apiConfidence = '$confidence%';
+        _apiDone = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _apiError = 'Scan failed. Please try again.';
+        _apiDone = true;
+      });
+    }
+    _checkComplete();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final size = MediaQuery.of(context).size;
+    _imgW = size.width * 0.38;
+    _imgH = size.width * 0.355;
   }
 
   void _handleImageFailed() {
@@ -65,6 +133,7 @@ class _ScanProcessingState extends State<ScanProcessing>
     _progressTimer?.cancel();
     _lineController.stop();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       _showUnsupportedDialog();
     });
   }
@@ -163,7 +232,6 @@ class _ScanProcessingState extends State<ScanProcessing>
             child: const Center(child: CircularProgressIndicator()),
           );
         }
-
         if (snapshot.data == true) {
           return Image.file(
             File(widget.imagePath),
@@ -172,8 +240,9 @@ class _ScanProcessingState extends State<ScanProcessing>
             fit: BoxFit.cover,
             gaplessPlayback: true,
             errorBuilder: (context, error, stackTrace) {
-              // ✅ الصورة موجودة بس مش اتعرضتش → popup
-              _handleImageFailed();
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _handleImageFailed(),
+              );
               return Container(
                 width: _imgW,
                 height: _imgH,
@@ -183,8 +252,6 @@ class _ScanProcessingState extends State<ScanProcessing>
             },
           );
         }
-
-        // ✅ الصورة مش موجودة أصلاً → popup
         _handleImageFailed();
         return Container(
           width: _imgW,
@@ -222,7 +289,7 @@ class _ScanProcessingState extends State<ScanProcessing>
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w400,
-                  color: Color(0XFF6A7282),
+                  color: Color(0xFF6A7282),
                   fontFamily: 'Poppins',
                 ),
               ),
@@ -248,7 +315,7 @@ class _ScanProcessingState extends State<ScanProcessing>
                               right: 0,
                               child: Container(
                                 height: 2,
-                                color: const Color(0XFF286E1A),
+                                color: const Color(0xFF286E1A),
                               ),
                             );
                           },
@@ -259,7 +326,7 @@ class _ScanProcessingState extends State<ScanProcessing>
                         right: -_borderOffset,
                         bottom: -_borderOffset,
                         child: Image.asset(
-                          "assets/border.png",
+                          'assets/border.png',
                           fit: BoxFit.fill,
                         ),
                       ),
@@ -274,7 +341,7 @@ class _ScanProcessingState extends State<ScanProcessing>
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 11,
-                    color: Color(0XFF4A4A4A),
+                    color: Color(0xFF4A4A4A),
                     fontFamily: 'Poppins',
                     fontWeight: FontWeight.w400,
                     height: 1.5,
@@ -292,21 +359,15 @@ class _ScanProcessingState extends State<ScanProcessing>
   }
 
   Widget _buildProgressSection() {
-    int percent = (_progress * 100).toInt();
+    final percent = (_progress * 100).toInt();
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
-          margin: const EdgeInsets.only(right: 21, left: 21),
-          padding: const EdgeInsets.only(
-            right: 20,
-            left: 20,
-            top: 8,
-            bottom: 8,
-          ),
+          margin: const EdgeInsets.symmetric(horizontal: 21),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0XFFEBF5E9),
+            color: const Color(0xFFEBF5E9),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
@@ -316,9 +377,9 @@ class _ScanProcessingState extends State<ScanProcessing>
                 width: 24,
                 height: 24,
                 decoration: BoxDecoration(
-                  color: const Color(0XFFEBF5E9),
+                  color: const Color(0xFFEBF5E9),
                   border: Border.all(
-                    color: const Color(0XFF399B25),
+                    color: const Color(0xFF399B25),
                     width: 1.6,
                   ),
                   shape: BoxShape.circle,
@@ -329,7 +390,7 @@ class _ScanProcessingState extends State<ScanProcessing>
                 'Scanning in progress... $percent%',
                 style: const TextStyle(
                   fontSize: 13,
-                  color: Color(0XFF4A4A4A),
+                  color: Color(0xFF4A4A4A),
                   fontWeight: FontWeight.w400,
                 ),
               ),
@@ -342,8 +403,8 @@ class _ScanProcessingState extends State<ScanProcessing>
           child: LinearProgressIndicator(
             value: _progress,
             minHeight: 6,
-            backgroundColor: const Color(0XFFF5F5F5),
-            valueColor: const AlwaysStoppedAnimation<Color>(Color(0XFF399B25)),
+            backgroundColor: const Color(0xFFF5F5F5),
+            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF399B25)),
           ),
         ),
       ],
@@ -351,12 +412,32 @@ class _ScanProcessingState extends State<ScanProcessing>
   }
 
   Widget _buildSuccessSection() {
+    if (_apiError != null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline, color: Color(0xFFD32F2F), size: 30),
+          const SizedBox(height: 8),
+          Text(
+            _apiError!,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFFD32F2F),
+              fontFamily: 'Poppins',
+            ),
+          ),
+          const SizedBox(height: 16),
+          GreenButton(text: 'Try Again', onPress: () => Navigator.pop(context)),
+        ],
+      );
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
+        const Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
+          children: [
             Icon(
               Icons.check_circle_outlined,
               color: Color(0xFF399B25),
@@ -367,52 +448,68 @@ class _ScanProcessingState extends State<ScanProcessing>
               'Scan Completed Successfully',
               style: TextStyle(
                 fontSize: 13,
-                color: Color(0XFF399B25),
+                color: Color(0xFF399B25),
                 fontFamily: 'Poppins',
                 fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12.5),
+        const SizedBox(height: 12),
         const Text(
           "We've identified your plant species and health condition",
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 11,
-            color: Color(0XFF4A4A4A),
+            color: Color(0xFF4A4A4A),
             fontWeight: FontWeight.w400,
             fontFamily: 'Poppins',
           ),
         ),
         const SizedBox(height: 20),
         GreenButton(
-          text: "See Result",
-          onPress: () {
-            String status;
-            if (!_resultSaved) {
-              _resultSaved = true;
-              final random = Random();
-              status = random.nextBool() ? 'Healthy' : 'Diseased';
-              recentScans.add(
-                ScanRecord(
-                  imagePath: widget.imagePath,
-                  plantName: 'Lettuce type',
-                  status: status,
-                  scanTime: DateTime.now(),
+          text: 'See Result',
+          onPress: () async {
+            if (_resultSaved) {
+              if (!mounted) return;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ResultPage(
+                    imagePath: widget.imagePath,
+                    plantName: 'Lettuce',
+                    status: _savedStatus!,
+                    confidence: _apiConfidence ?? '94%',
+                  ),
                 ),
               );
-            } else {
-              status = recentScans.last.status;
+              return;
             }
 
+            _resultSaved = true;
+            final status = _apiStatus ?? 'Healthy';
+            _savedStatus = status;
+
+            scansState.add(
+              ScanRecord(
+                imagePath: widget.imagePath,
+                plantName: 'Lettuce',
+                status: status,
+                confidence: _apiConfidence ?? '—',
+                scanTime: DateTime.now(),
+              ),
+            );
+            await saveScans();
+
+            if (!mounted) return;
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => ResultPage(
+                builder: (_) => ResultPage(
                   imagePath: widget.imagePath,
-                  plantName: 'Lettuce type',
+                  plantName: 'Lettuce',
                   status: status,
+                  confidence: _apiConfidence ?? '94%',
                 ),
               ),
             );
@@ -420,4 +517,5 @@ class _ScanProcessingState extends State<ScanProcessing>
         ),
       ],
     );
-  }}
+  }
+}

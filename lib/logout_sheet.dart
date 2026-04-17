@@ -1,14 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'user_state.dart';
-import 'recentScan.dart';
+import 'recent_scan.dart';
 
 class LogoutSheet extends StatelessWidget {
   const LogoutSheet({super.key});
 
+  Future<void> _handleLogout(BuildContext context) async {
+    await userState.clearAll();
+    scansState.clear();
+
+    Fluttertoast.showToast(
+      msg: 'Logged out successfully',
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.CENTER,
+      backgroundColor: const Color(0xFFD32F2F),
+      textColor: Colors.white,
+      fontSize: 14,
+    );
+
+    if (context.mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil('Login', (route) => false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -22,7 +40,7 @@ class LogoutSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          Image.asset('assets/logout-door.png', height: 160),
+          Image.asset('assets/logout-door.png', height: 160, cacheHeight: 160),
           const SizedBox(height: 24),
           const Text(
             'Are you sure you want to log out?',
@@ -50,24 +68,7 @@ class LogoutSheet extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {
-                    // ✅ مسح كل البيانات
-                    userState.clearAll();
-                    recentScans.clear();
-
-                    Navigator.of(
-                      context,
-                    ).pushNamedAndRemoveUntil('Login', (route) => false);
-
-                    Fluttertoast.showToast(
-                      msg: "Logged out successfully",
-                      toastLength: Toast.LENGTH_SHORT,
-                      gravity: ToastGravity.CENTER,
-                      backgroundColor: const Color(0xFFD32F2F),
-                      textColor: Colors.white,
-                      fontSize: 14,
-                    );
-                  },
+                  onPressed: () => _handleLogout(context),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFFD32F2F), width: 1),
                     shape: RoundedRectangleBorder(
