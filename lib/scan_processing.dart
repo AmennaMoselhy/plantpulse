@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'green_button.dart';
 import 'recent_scan.dart';
-import 'resultpage.dart';
+import 'result_page.dart';
 import 'user_state.dart';
 
 class ScanProcessing extends StatefulWidget {
@@ -33,8 +33,12 @@ class _ScanProcessingState extends State<ScanProcessing>
 
   String? _apiStatus;
   String? _apiConfidence;
+  String? _apiDiseaseName;
+  String? _apiDescription;
+  String? _apiTreatment;
   bool _apiDone = false;
   String? _apiError;
+  bool _isNetworkError = false;
 
   static const _scanUrl =
       'https://plant-pules-api.vercel.app/api/v1/scan/predict';
@@ -60,7 +64,12 @@ class _ScanProcessingState extends State<ScanProcessing>
     _progressTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
       if (!mounted) return;
       setState(() {
-        _progress += 0.014;
+        if (_progress < 0.9) {
+          _progress += 0.014;
+        } else if (_apiDone && _progress < 1.0) {
+          _progress += 0.05;
+        }
+
         if (_progress >= 1.0) {
           _progress = 1.0;
           _lineController.stop();
@@ -81,10 +90,7 @@ class _ScanProcessingState extends State<ScanProcessing>
     try {
       final dio = Dio();
       final formData = FormData.fromMap({
-        'images': await MultipartFile.fromFile(
-          widget.imagePath,
-          filename: 'scan.jpg',
-        ),
+        'images': await MultipartFile.fromFile(widget.imagePath),
       });
 
       final response = await dio.post(
@@ -101,18 +107,68 @@ class _ScanProcessingState extends State<ScanProcessing>
 
       final data = response.data['data'];
       final decision = (data?['finalDecision'] as String? ?? '').toLowerCase();
-      final confidence = (data?['averageConfidence'] as num? ?? 0)
-          .toStringAsFixed(0);
+      final confidenceNum = (data?['averageConfidence'] as num? ?? 0);
+
+      final results = data?['results'] as List?;
+      final firstResult = results?.isNotEmpty == true
+          ? results!.first as Map<String, dynamic>?
+          : null;
+
+      if (decision == 'not_lettuce') {
+        setState(() => _apiDone = true);
+        _showUnsupportedDialog();
+        return;
+      }
 
       setState(() {
         _apiStatus = decision == 'healthy' ? 'Healthy' : 'Diseased';
-        _apiConfidence = '$confidence%';
+        _apiConfidence = confidenceNum.toStringAsFixed(0);
+        _apiDiseaseName = firstResult?['disease_name']?.toString();
+        _apiDescription = firstResult?['description']?.toString();
+        _apiTreatment = firstResult?['treatment']?.toString();
+        _apiDone = true;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+
+      String errorMsg;
+      bool isNetwork = false;
+
+      switch (e.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+          errorMsg =
+              'Connection timed out. Please check your internet and try again.';
+          isNetwork = true;
+          break;
+        case DioExceptionType.connectionError:
+          errorMsg = 'No internet connection. Please try again.';
+          isNetwork = true;
+          break;
+        case DioExceptionType.badResponse:
+          final statusCode = e.response?.statusCode ?? 0;
+          if (statusCode >= 500) {
+            errorMsg = 'Server error. Please try again in a moment.';
+          } else if (statusCode == 401) {
+            errorMsg = 'Session expired. Please log in again.';
+          } else {
+            errorMsg = 'Something went wrong. Please try again.';
+          }
+          break;
+        default:
+          errorMsg = 'Something went wrong. Please try again.';
+      }
+
+      setState(() {
+        _apiError = errorMsg;
+        _isNetworkError = isNetwork;
         _apiDone = true;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _apiError = 'Scan failed. Please try again.';
+        _apiError = 'Something went wrong. Please try again.';
         _apiDone = true;
       });
     }
@@ -416,18 +472,52 @@ class _ScanProcessingState extends State<ScanProcessing>
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.error_outline, color: Color(0xFFD32F2F), size: 30),
-          const SizedBox(height: 8),
-          Text(
-            _apiError!,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFFD32F2F),
-              fontFamily: 'Poppins',
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFEBEB),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFFADAD), width: 0.4),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.wifi_off_rounded,
+                  color: Color(0xFFD32F2F),
+                  size: 22,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _apiError!,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFFD32F2F),
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
-          GreenButton(text: 'Try Again', onPress: () => Navigator.pop(context)),
+          GreenButton(
+            text: 'Try Again',
+            onPress: () {
+              setState(() {
+                _apiError = null;
+                _isNetworkError = false;
+                _apiDone = false;
+                _scanComplete = false;
+                _progress = 0.0;
+                _resultSaved = false;
+                _savedStatus = null;
+              });
+              _startAnimation();
+              _callScanApi();
+            },
+          ),
         ],
       );
     }
@@ -479,7 +569,10 @@ class _ScanProcessingState extends State<ScanProcessing>
                     imagePath: widget.imagePath,
                     plantName: 'Lettuce',
                     status: _savedStatus!,
-                    confidence: _apiConfidence ?? '94%',
+                    confidence: _apiConfidence ?? '0',
+                    diseaseName: _apiDiseaseName,
+                    description: _apiDescription,
+                    treatment: _apiTreatment,
                   ),
                 ),
               );
@@ -495,8 +588,11 @@ class _ScanProcessingState extends State<ScanProcessing>
                 imagePath: widget.imagePath,
                 plantName: 'Lettuce',
                 status: status,
-                confidence: _apiConfidence ?? '—',
+                confidence: _apiConfidence ?? '0',
                 scanTime: DateTime.now(),
+                diseaseName: _apiDiseaseName,
+                description: _apiDescription,
+                treatment: _apiTreatment,
               ),
             );
             await saveScans();
@@ -508,8 +604,11 @@ class _ScanProcessingState extends State<ScanProcessing>
                 builder: (_) => ResultPage(
                   imagePath: widget.imagePath,
                   plantName: 'Lettuce',
-                  status: status,
-                  confidence: _apiConfidence ?? '94%',
+                  status: _savedStatus!,
+                  confidence: _apiConfidence ?? '0',
+                  diseaseName: _apiDiseaseName,
+                  description: _apiDescription,
+                  treatment: _apiTreatment,
                 ),
               ),
             );

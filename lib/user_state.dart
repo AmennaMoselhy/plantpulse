@@ -24,26 +24,31 @@ class UserState extends ChangeNotifier {
 
   Future<SharedPreferences> _getPrefs() => SharedPreferences.getInstance();
 
-  void saveUserData({
+  Future<void> saveUserData({
     required String email,
     required String password,
     String fullName = '',
     String gender = '',
-  }) {
+  }) async {
+    print('saveUserData token before: $_token');
     _email = email;
     _password = password;
     _fullName = fullName;
     _gender = gender;
-    _persistLoginState(email, fullName, password, gender);
+    final prefs = await _getPrefs();
+    _token = prefs.getString('savedToken') ?? _token;
+    _profileImagePath =
+        prefs.getString('savedImagePath_$email') ?? _profileImagePath;
+    await _persistLoginState(email, fullName, password, gender);
     notifyListeners();
   }
 
   Future<void> _persistLoginState(
-      String email,
-      String fullName,
-      String password,
-      String gender,
-      ) async {
+    String email,
+    String fullName,
+    String password,
+    String gender,
+  ) async {
     final prefs = await _getPrefs();
     await prefs.setString('savedFullName', fullName);
     await prefs.setBool('isLoggedIn', true);
@@ -93,6 +98,9 @@ class UserState extends ChangeNotifier {
   Future<void> _persistImagePath(String path) async {
     final prefs = await _getPrefs();
     await prefs.setString('savedImagePath', path);
+    if (_email.isNotEmpty) {
+      await prefs.setString('savedImagePath_$_email', path);
+    }
   }
 
   Future<void> loadPersistedData() async {
@@ -102,7 +110,10 @@ class UserState extends ChangeNotifier {
     _email = prefs.getString('savedEmail') ?? '';
     _password = prefs.getString('savedPassword') ?? '';
     _gender = prefs.getString('savedGender') ?? 'male';
-    _profileImagePath = prefs.getString('savedImagePath');
+    _profileImagePath = _email.isNotEmpty
+        ? (prefs.getString('savedImagePath_$_email') ??
+              prefs.getString('savedImagePath'))
+        : prefs.getString('savedImagePath');
   }
 
   Future<void> clearAll() async {
@@ -113,7 +124,6 @@ class UserState extends ChangeNotifier {
     _gender = '';
     _fullName = '';
     await _clearLoginState();
-
     notifyListeners();
   }
 
@@ -131,6 +141,7 @@ class UserState extends ChangeNotifier {
     await prefs.remove('savedEmail');
     await prefs.remove('savedFullName');
     await prefs.remove('savedPassword');
+    await prefs.remove('savedGender');
     await prefs.remove('savedImagePath');
   }
 }

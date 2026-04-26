@@ -1,7 +1,7 @@
+import 'package:PlantPulse/recent_scan.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'user_state.dart';
-import 'recent_scan.dart';
 
 class LogoutSheet extends StatelessWidget {
   const LogoutSheet({super.key});
@@ -9,6 +9,7 @@ class LogoutSheet extends StatelessWidget {
   Future<void> _handleLogout(BuildContext context) async {
     await userState.clearAll();
     scansState.clear();
+    await saveScans();
 
     Fluttertoast.showToast(
       msg: 'Logged out successfully',

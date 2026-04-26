@@ -23,8 +23,21 @@ class _LoginState extends State<Login> {
   bool _isLoading = false;
 
   static final _emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$');
-  static const _signinUrl =
+  static const _sign_inUrl =
       'https://plant-pules-api.vercel.app/api/v1/auth/signin';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null) {
+        _emailController.text = args['email'] ?? '';
+        _passwordController.text = args['password'] ?? '';
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -55,33 +68,9 @@ class _LoginState extends State<Login> {
     final password = _passwordController.text;
 
     try {
-      await userState.loadPersistedData();
-
-      final savedEmail = userState.email;
-      final savedPassword = userState.password;
-
-      if (savedEmail == email &&
-          savedPassword == password &&
-          savedPassword.isNotEmpty) {
-        if (!mounted) return;
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          'HomePage',
-          (route) => false,
-          arguments: {
-            'firstName': userState.fullName.isNotEmpty
-                ? userState.fullName.split(' ')[0]
-                : '',
-            'fullName': userState.fullName,
-            'email': email,
-            'password': password,
-          },
-        );
-        return;
-      }
-
       final dio = Dio();
       final response = await dio.post(
-        _signinUrl,
+        _sign_inUrl,
         data: {'email': email, 'password': password},
         options: Options(
           receiveTimeout: const Duration(seconds: 15),
@@ -90,44 +79,58 @@ class _LoginState extends State<Login> {
       );
 
       final token = response.data['token'] as String?;
-
       if (token == null || token.isEmpty) {
         _showError('Login failed. Please try again.');
         return;
       }
 
       await userState.saveToken(token);
+      print('Token after saveToken: ${userState.token}');
+
+      String fullName = '';
+      String gender = 'male';
 
       try {
         final profileRes = await dio.get(
           'https://plant-pules-api.vercel.app/api/v1/users/profile',
           options: Options(headers: {'token': token}),
         );
-        final name = profileRes.data['data']['name'] as String? ?? '';
+
+        fullName = profileRes.data['data']['name'] as String? ?? '';
+        final genderFromApi =
+            profileRes.data['data']['gender'] as String? ?? '';
+
         final prefs = await SharedPreferences.getInstance();
-        final savedGender = prefs.getString('savedGender') ?? 'male';
-        userState.saveUserData(
-          email: email,
-          password: password,
-          fullName: name,
-          gender: savedGender,
-        );
-        await loadScansFromApi(token);
+        gender = genderFromApi.isNotEmpty
+            ? genderFromApi.toLowerCase()
+            : (prefs.getString('savedGender') ?? 'male');
       } catch (_) {
-        userState.saveUserData(email: email, password: password, fullName: '');
+        fullName = '';
       }
+
+      await userState.saveUserData(
+        email: email,
+        password: password,
+        fullName: fullName,
+        gender: gender,
+      );
+      print('Token after saveUserData: ${userState.token}');
+
+      await loadScansFromApi(token);
+      print('Scans after login: ${scansState.length}');
+
+
       if (!mounted) return;
 
       Navigator.of(context).pushNamedAndRemoveUntil(
         'HomePage',
         (route) => false,
         arguments: {
-          'firstName': userState.fullName.isNotEmpty
-              ? userState.fullName.split(' ')[0]
-              : '',
-          'fullName': userState.fullName,
+          'firstName': fullName.isNotEmpty ? fullName.split(' ')[0] : '',
+          'fullName': fullName,
           'email': email,
           'password': password,
+          'gender': gender,
         },
       );
     } on DioException catch (e) {
@@ -176,7 +179,7 @@ class _LoginState extends State<Login> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Textfield(
+                  Text_field(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     title: 'Email',
@@ -184,7 +187,7 @@ class _LoginState extends State<Login> {
                     validator: _validateEmail,
                   ),
                   SizedBox(height: size.height * 0.019),
-                  Textfield(
+                  Text_field(
                     controller: _passwordController,
                     keyboardType: TextInputType.visiblePassword,
                     title: 'Password',

@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'user_state.dart';
+// import '/user_state.dart';
 
 class ResultPage extends StatefulWidget {
   final String imagePath;
@@ -9,6 +9,9 @@ class ResultPage extends StatefulWidget {
   final String confidence;
   final String? imageUrl;
   final bool fromRecentScan;
+  final String? diseaseName;
+  final String? description;
+  final String? treatment;
 
   const ResultPage({
     super.key,
@@ -18,6 +21,9 @@ class ResultPage extends StatefulWidget {
     required this.status,
     required this.confidence,
     this.fromRecentScan = false,
+    this.diseaseName,
+    this.description,
+    this.treatment,
   });
 
   @override
@@ -29,29 +35,35 @@ class _ResultPageState extends State<ResultPage> {
 
   bool get isHealthy => widget.status == 'Healthy';
 
+  String get safeConfidence {
+    if (widget.confidence.isEmpty ||
+        widget.confidence == '—' ||
+        widget.confidence == 'null') {
+      return '0';
+    }
+    return widget.confidence;
+  }
+
   void _handleBack() {
     if (widget.fromRecentScan) {
+      // came from RecentScan → just pop back to it
       Navigator.of(context).pop();
     } else {
+      // came from ScanProcessing → pop back to RecentScan
       Navigator.of(context).pushNamedAndRemoveUntil(
-        'HomePage',
-            (route) => false,
-        arguments: {
-          'firstName': userState.fullName.isNotEmpty
-              ? userState.fullName.split(' ')[0]
-              : '',
-          'fullName': userState.fullName,
-          'email': userState.email,
-        },
+        'RecentScan',
+        (route) => route.settings.name == 'HomePage',
       );
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         _handleBack();
       },
@@ -83,26 +95,27 @@ class _ResultPageState extends State<ResultPage> {
 
   Widget _buildAppBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
           GestureDetector(
             onTap: _handleBack,
             child: const Icon(
-              Icons.arrow_back_ios,
+              Icons.arrow_back_ios_new_rounded,
               size: 24,
-              color: Color(0XFF4A4A4A),
+              color: Color(0xFF4A4A4A),
             ),
           ),
           const Expanded(
-            child: Text(
-              'Result Page',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                fontFamily: 'Poppins',
-                color: Color(0xFF1F1F1F),
+            child: Center(
+              child: Text(
+                'Scan Result',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: Color(0xFF1F1F1F),
+                  fontFamily: 'Poppins',
+                ),
               ),
             ),
           ),
@@ -113,56 +126,49 @@ class _ResultPageState extends State<ResultPage> {
   }
 
   Widget _buildImage(Size size) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: widget.imageUrl != null && widget.imageUrl!.isNotEmpty
-            ? Image.network(
-                widget.imageUrl!,
-                width: double.infinity,
-                height: size.height * 0.25,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  height: size.height * 0.25,
-                  color: const Color(0xFFD9D9D9),
-                  child: const Icon(
-                    Icons.image_not_supported,
-                    size: 60,
-                    color: Colors.grey,
-                  ),
-                ),
-              )
-            : FutureBuilder<bool>(
-                future: _imageExistsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const SizedBox(
-                      height: 200,
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  if (snapshot.data == true) {
-                    return Image.file(
-                      File(widget.imagePath),
-                      width: double.infinity,
-                      height: size.height * 0.25,
-                      fit: BoxFit.cover,
-                    );
-                  }
-                  return Container(
-                    width: double.infinity,
-                    height: size.height * 0.25,
-                    color: const Color(0xFFD9D9D9),
-                    child: const Icon(
-                      Icons.image_not_supported,
-                      size: 60,
-                      color: Colors.grey,
-                    ),
-                  );
-                },
-              ),
+    Widget imageWidget;
+    if (widget.imageUrl != null && widget.imageUrl!.isNotEmpty) {
+      imageWidget = Image.network(
+        widget.imageUrl!,
+        width: double.infinity,
+        height: size.height * 0.32,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _imagePlaceholder(size),
+      );
+    } else if (widget.imagePath.isNotEmpty) {
+      imageWidget = FutureBuilder<bool>(
+        future: _imageExistsFuture,
+        builder: (context, snap) {
+          if (snap.data == true) {
+            return Image.file(
+              File(widget.imagePath),
+              width: double.infinity,
+              height: size.height * 0.32,
+              fit: BoxFit.cover,
+            );
+          }
+          return _imagePlaceholder(size);
+        },
+      );
+    } else {
+      imageWidget = _imagePlaceholder(size);
+    }
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        bottomLeft: Radius.circular(16),
+        bottomRight: Radius.circular(16),
       ),
+      child: imageWidget,
+    );
+  }
+
+  Widget _imagePlaceholder(Size size) {
+    return Container(
+      width: double.infinity,
+      height: size.height * 0.32,
+      color: const Color(0xFFEBF5E9),
+      child: const Icon(Icons.eco, size: 80, color: Color(0xFF399B25)),
     );
   }
 
@@ -175,50 +181,63 @@ class _ResultPageState extends State<ResultPage> {
           Text(
             widget.plantName,
             style: const TextStyle(
-              fontSize: 14,
+              fontSize: 20,
               fontWeight: FontWeight.w700,
+              color: Color(0xFF1F1F1F),
               fontFamily: 'Poppins',
-              color: Color(0xFF000000),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: isHealthy
-                  ? const Color(0xFFEBF5E9)
-                  : const Color(0xFFFBEAEA),
-              borderRadius: BorderRadius.circular(63),
-              border: Border.all(
-                color: isHealthy
-                    ? const Color(0xFFA4D19B)
-                    : const Color(0xFFEB9F9F),
-                width: 0.4,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isHealthy ? Icons.check_circle_outline : Icons.error_outline,
-                  size: 13,
-                  color: isHealthy
-                      ? const Color(0xFF399B25)
-                      : const Color(0xFFD32F2F),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
                 ),
-                const SizedBox(width: 4),
+                decoration: BoxDecoration(
+                  color: isHealthy
+                      ? const Color(0xFFEBF5E9)
+                      : const Color(0xFFFFEBEB),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isHealthy ? Icons.check_circle : Icons.warning_rounded,
+                      size: 14,
+                      color: isHealthy
+                          ? const Color(0xFF399B25)
+                          : const Color(0xFFD32F2F),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      widget.status,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isHealthy
+                            ? const Color(0xFF399B25)
+                            : const Color(0xFFD32F2F),
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!isHealthy && widget.diseaseName != null) ...[
+                const SizedBox(height: 4),
                 Text(
-                  isHealthy ? 'Healthy Condition' : 'Issue Detected',
-                  style: TextStyle(
-                    fontSize: 10,
+                  widget.diseaseName!,
+                  style: const TextStyle(
+                    fontSize: 11,
                     fontWeight: FontWeight.w500,
                     fontFamily: 'Poppins',
-                    color: isHealthy
-                        ? const Color(0xFF399B25)
-                        : const Color(0xFFD32F2F),
+                    color: Color(0xFFD32F2F),
                   ),
                 ),
               ],
-            ),
+            ],
           ),
         ],
       ),
@@ -226,62 +245,46 @@ class _ResultPageState extends State<ResultPage> {
   }
 
   Widget _buildMessageCard() {
+    final message = isHealthy
+        ? 'Your plant looks healthy! Keep up the good care and continue monitoring regularly.'
+        : 'Your plant shows signs of disease. Consider consulting an expert or adjusting care routines.';
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
-        width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isHealthy ? const Color(0xFFEBF5E9) : const Color(0xFFFBEAEA),
-          borderRadius: BorderRadius.circular(8),
+          color: isHealthy ? const Color(0xFFEBF5E9) : const Color(0xFFFFEBEB),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isHealthy
                 ? const Color(0xFFA4D19B)
-                : const Color(0xFFEB9F9F),
-            width: 0.4,
+                : const Color(0xFFFFADAD),
+            width: 0.6,
           ),
         ),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  isHealthy ? Icons.check_circle_outline : Icons.error_outline,
-                  color: isHealthy
-                      ? const Color(0xFF399B25)
-                      : const Color(0xFFD32F2F),
-                  size: 24,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  isHealthy
-                      ? 'Your plant is healthy and thriving!'
-                      : 'Detected Disease',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Poppins',
-                    color: Color(0xFF4A4A4A),
-                  ),
-                ),
-              ],
+            Icon(
+              isHealthy ? Icons.eco : Icons.healing,
+              color: isHealthy
+                  ? const Color(0xFF399B25)
+                  : const Color(0xFFD32F2F),
+              size: 22,
             ),
-            if (!isHealthy) ...[
-              const SizedBox(height: 4),
-              const Padding(
-                padding: EdgeInsets.only(left: 28),
-                child: Text(
-                  'Disease Detected',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    fontFamily: 'Poppins',
-                    color: Color(0xFFD32F2F),
-                  ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 13,
+                  height: 1.5,
+                  fontFamily: 'Poppins',
+                  color: Color(0xFF1F1F1F),
                 ),
               ),
-            ],
+            ),
           ],
         ),
       ),
@@ -297,7 +300,7 @@ class _ResultPageState extends State<ResultPage> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0XFFFFFFFF),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFFA4D19B), width: 0.4),
               ),
@@ -322,7 +325,7 @@ class _ResultPageState extends State<ResultPage> {
                         ),
                       ),
                       Text(
-                        widget.confidence,
+                        '$safeConfidence%',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -385,19 +388,43 @@ class _ResultPageState extends State<ResultPage> {
     );
   }
 
+  List<String> _parseTreatment(String treatment) {
+    if (treatment.contains('|||')) {
+      return treatment
+          .split('|||')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+    }
+    String cleaned = treatment.trim();
+    if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
+      cleaned = cleaned.substring(1, cleaned.length - 1);
+    }
+    return cleaned
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
   Widget _buildCareTips() {
+    final bool hasApiData =
+        !isHealthy && (widget.diseaseName != null || widget.treatment != null);
+
     final tips = isHealthy
         ? [
-            'Use clean, fresh water',
-            'Maintain proper temperature',
-            'Provide balanced lighting',
-            'Ensure good air circulation',
+            'Water regularly and avoid overwatering',
+            'Ensure adequate sunlight exposure',
+            'Use well-draining soil',
+            'Apply balanced fertilizer monthly',
           ]
+        : widget.treatment != null
+        ? _parseTreatment(widget.treatment!)
         : [
-            'Change the water immediately',
-            'Adjust nutrient solution',
-            'Avoid excessive light',
-            'Remove affected leaves',
+            'Remove infected leaves immediately',
+            'Improve air circulation around the plant',
+            'Avoid wetting leaves when watering',
+            'Consider using appropriate fungicide or pesticide',
           ];
 
     return Padding(
@@ -417,38 +444,59 @@ class _ResultPageState extends State<ResultPage> {
               children: [
                 Image.asset('assets/lamp.png', width: 24, height: 24),
                 const SizedBox(width: 8),
-                Text(
-                  isHealthy
-                      ? 'Care Tips for Ongoing Health'
-                      : 'Recommended Treatment Steps',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Poppins',
-                    color: Color(0xFF1F1F1F),
+                Expanded(
+                  child: Text(
+                    isHealthy
+                        ? 'Care Tips for Ongoing Health'
+                        : hasApiData && widget.diseaseName != null
+                        ? 'Treatment: ${widget.diseaseName}'
+                        : 'Recommended Treatment Steps',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins',
+                      color: Color(0xFF1F1F1F),
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            if (!isHealthy && widget.description != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                widget.description!,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  fontFamily: 'Poppins',
+                  color: Color(0xFF717171),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
             ...tips.map(
               (tip) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      '• ',
-                      style: TextStyle(color: Color(0xFF1F1F1F), fontSize: 10),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: Icon(
+                        Icons.circle,
+                        size: 6,
+                        color: Color(0xFF399B25),
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         tip,
                         style: const TextStyle(
-                          fontSize: 10,
+                          fontSize: 13,
+                          height: 1.4,
                           fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w400,
-                          color: Color(0xFF1F1F1F),
+                          color: Color(0xFF4A4A4A),
                         ),
                       ),
                     ),

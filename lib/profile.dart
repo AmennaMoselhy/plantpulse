@@ -7,6 +7,107 @@ import 'change_password_sheet.dart';
 import 'logout_sheet.dart';
 import 'package:dio/dio.dart';
 import 'user_state.dart';
+import 'recent_scan.dart';
+import 'contact_us_sheet.dart';
+
+Future<bool?> showSavePhotoDialog(BuildContext ctx, String imagePath) {
+  return showDialog<bool>(
+    context: ctx,
+    builder: (dialogCtx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text(
+        'Save Profile Photo?',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          fontFamily: 'Poppins',
+          color: Color(0xFF1F1F1F),
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipOval(
+            child: Image.file(
+              File(imagePath),
+              width: 100,
+              height: 100,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Use this photo as your profile picture?',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontFamily: 'Poppins',
+              color: Color(0xFF676767),
+            ),
+          ),
+        ],
+      ),
+      actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      actions: [
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(dialogCtx, false),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF399B25)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: Color(0xFF399B25),
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(dialogCtx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF399B25),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Save',
+                  style: TextStyle(color: Colors.white, fontFamily: 'Poppins'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> uploadProfileImage(String localPath) async {
+  if (userState.token.isEmpty) return;
+  try {
+    final dio = Dio();
+    final formData = FormData.fromMap({
+      'image': await MultipartFile.fromFile(localPath, filename: 'profile.jpg'),
+    });
+    await dio.put(
+      'https://plant-pules-api.vercel.app/api/v1/users/profile',
+      data: formData,
+      options: Options(headers: {'token': userState.token}),
+    );
+  } catch (_) {}
+}
 
 class Profile extends StatefulWidget {
   final String fullName;
@@ -58,12 +159,247 @@ class _ProfileState extends State<Profile> {
     final picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
+
+    if (!mounted) return;
+    final confirmed = await showSavePhotoDialog(context, image.path);
+    if (confirmed != true || !mounted) return;
+
     final bytes = await image.readAsBytes();
     final tempDir = await getApplicationDocumentsDirectory();
     final newPath =
         '${tempDir.path}/profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
     await File(newPath).writeAsBytes(bytes);
     userState.updateProfileImage(newPath);
+    await uploadProfileImage(newPath);
+  }
+
+  void _showPhotoOptionsSheet() {
+    final hasPhoto =
+        userState.profileImagePath != null &&
+        userState.profileImagePath!.isNotEmpty;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFD9D9D9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Profile photo',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Poppins',
+                color: Color(0xFF1F1F1F),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _photoOption(
+              icon: Icons.photo_library_outlined,
+              iconColor: const Color(0xFF399B25),
+              bgColor: const Color(0xFFEAF3DE),
+              title: 'Change photo',
+              subtitle: 'Choose from your gallery',
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickProfileImage();
+              },
+            ),
+            if (hasPhoto) ...[
+              const SizedBox(height: 12),
+              _photoOption(
+                icon: Icons.delete_outline,
+                iconColor: const Color(0xFFD32F2F),
+                bgColor: const Color(0xFFFFEBEB),
+                title: 'Remove photo',
+                subtitle: 'Reset to default picture',
+                titleColor: const Color(0xFFD32F2F),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmRemovePhoto();
+                },
+              ),
+            ],
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _photoOption({
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required String title,
+    required String subtitle,
+    Color? titleColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFCCCCCC), width: 0.4),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Poppins',
+                      color: titleColor ?? const Color(0xFF184110),
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontFamily: 'Poppins',
+                      color: Color(0xFF676767),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: Color(0xFF222222),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmRemovePhoto() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+        actionsPadding: EdgeInsets.zero,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFEBEB),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.delete_outline,
+                color: Color(0xFFD32F2F),
+                size: 28,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Remove profile photo?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Poppins',
+                color: Color(0xFF1F1F1F),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Your profile picture will be reset to the default avatar.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontFamily: 'Poppins',
+                color: Color(0xFF676767),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+        actions: [
+          const Divider(height: 0.5, thickness: 0.5),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      color: Color(0xFF676767),
+                    ),
+                  ),
+                ),
+              ),
+              Container(width: 0.5, height: 48, color: const Color(0xFFCCCCCC)),
+              Expanded(
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text(
+                    'Remove',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      color: Color(0xFFD32F2F),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final oldPath = userState.profileImagePath;
+    userState.updateProfileImage('');
+    if (mounted) setState(() {});
+
+    if (oldPath != null) {
+      try {
+        final file = File(oldPath);
+        if (await file.exists()) await file.delete();
+      } catch (_) {}
+    }
   }
 
   void _showEditProfileSheet() {
@@ -151,48 +487,54 @@ class _ProfileState extends State<Profile> {
                 ],
               ),
               const SizedBox(height: 24),
-              Stack(
-                children: [
-                  ClipOval(
-                    child: userState.profileImagePath != null
-                        ? Image.file(
-                            File(userState.profileImagePath!),
-                            width: size.width * 0.24,
-                            height: size.height * 0.111,
-                            fit: BoxFit.cover,
-                            cacheWidth: imgW,
-                          )
-                        : Image.asset(
-                            userState.gender.toLowerCase() == 'female'
-                                ? 'assets/bigProfilePic.png'
-                                : 'assets/male.png',
-                            width: size.width * 0.24,
-                            height: size.height * 0.111,
-                            fit: BoxFit.cover,
-                            cacheWidth: imgW,
+              // Profile image with long press to show options
+              GestureDetector(
+                onLongPress: _showPhotoOptionsSheet,
+                child: Stack(
+                  children: [
+                    ClipOval(
+                      child:
+                          userState.profileImagePath != null &&
+                              userState.profileImagePath!.isNotEmpty
+                          ? Image.file(
+                              File(userState.profileImagePath!),
+                              width: size.width * 0.24,
+                              height: size.height * 0.111,
+                              fit: BoxFit.cover,
+                              cacheWidth: imgW,
+                            )
+                          : Image.asset(
+                              userState.gender.toLowerCase() == 'female'
+                                  ? 'assets/bigProfilePic.png'
+                                  : 'assets/male.png',
+                              width: size.width * 0.24,
+                              height: size.height * 0.111,
+                              fit: BoxFit.cover,
+                              cacheWidth: imgW,
+                            ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _pickProfileImage,
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF399B25),
+                            shape: BoxShape.circle,
                           ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: _pickProfileImage,
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF399B25),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.edit,
-                          color: Colors.white,
-                          size: 18,
+                          child: const Icon(
+                            Icons.edit,
+                            color: Colors.white,
+                            size: 18,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
               Text(
@@ -216,6 +558,23 @@ class _ProfileState extends State<Profile> {
                 icon: 'setting',
                 label: 'Account Settings',
                 onTap: _showAccountSettingsSheet,
+              ),
+              const SizedBox(height: 16),
+              _buildMenuItem(
+                icon: 'profile-circle',
+                label: 'Contact Us',
+                onTap: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  useSafeArea: true,
+                  backgroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                  ),
+                  builder: (context) => const ContactUsSheet(),
+                ),
               ),
               const SizedBox(height: 16),
               _buildMenuItem(
@@ -286,9 +645,92 @@ class _ProfileState extends State<Profile> {
   }
 }
 
-
-class _AccountSettingsSheet extends StatelessWidget {
+class _AccountSettingsSheet extends StatefulWidget {
   const _AccountSettingsSheet();
+
+  @override
+  State<_AccountSettingsSheet> createState() => _AccountSettingsSheetState();
+}
+
+class _AccountSettingsSheetState extends State<_AccountSettingsSheet> {
+  bool _deletingAccount = false;
+
+  Future<void> _handleDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Delete Account',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Poppins',
+            color: Color(0xFFD32F2F),
+          ),
+        ),
+        content: const Text(
+          'Are you sure you want to delete your account? This action cannot be undone.',
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Color(0xFF399B25), fontFamily: 'Poppins'),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Color(0xFFD32F2F), fontFamily: 'Poppins'),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deletingAccount = true);
+
+    try {
+      final dio = Dio();
+      await dio.delete(
+        'https://plant-pules-api.vercel.app/api/v1/users/profile',
+        options: Options(headers: {'token': userState.token}),
+      );
+
+      await userState.clearAll();
+      scansState.clear();
+      await saveScans();
+
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil('Login', (r) => false);
+
+      Fluttertoast.showToast(
+        msg: 'Account deleted successfully',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.CENTER,
+        backgroundColor: const Color(0xFFD32F2F),
+        textColor: Colors.white,
+        fontSize: 14,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _deletingAccount = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Failed to delete account. Please try again.',
+            style: TextStyle(fontFamily: 'Poppins'),
+          ),
+          backgroundColor: Color(0xFFD32F2F),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -355,6 +797,54 @@ class _AccountSettingsSheet extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: _deletingAccount ? null : _handleDeleteAccount,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEBEB),
+                border: Border.all(color: const Color(0xFFFFADAD), width: 0.4),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.delete_outline,
+                    color: Color(0xFFD32F2F),
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Delete Account',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Poppins',
+                        color: Color(0xFFD32F2F),
+                      ),
+                    ),
+                  ),
+                  if (_deletingAccount)
+                    const SizedBox(
+                      width: 19,
+                      height: 19,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFFD32F2F),
+                      ),
+                    )
+                  else
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 19,
+                      color: Color(0xFFD32F2F),
+                    ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 24),
         ],
       ),
@@ -362,10 +852,8 @@ class _AccountSettingsSheet extends StatelessWidget {
   }
 }
 
-
 class _EditProfileSheet extends StatefulWidget {
   final String fullName;
-
   final void Function(String newName) onSave;
 
   const _EditProfileSheet({required this.fullName, required this.onSave});
@@ -378,11 +866,11 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   String _selectedGender = userState.gender;
-
-  static final _emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$');
-
   bool _nameError = false;
-  bool _emailError = false;
+
+  // bool _emailError = false;
+  // String? _emailErrorMessage;
+  // bool _isCheckingEmail = false;
 
   @override
   void initState() {
@@ -403,38 +891,47 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     final picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
+
+    if (!mounted) return;
+    final confirmed = await showSavePhotoDialog(context, image.path);
+    if (confirmed != true || !mounted) return;
+
     final bytes = await image.readAsBytes();
     final tempDir = await getApplicationDocumentsDirectory();
     final newPath =
         '${tempDir.path}/profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
     await File(newPath).writeAsBytes(bytes);
     userState.updateProfileImage(newPath);
+    await uploadProfileImage(newPath);
     if (mounted) setState(() {});
   }
 
   Future<void> _handleSave() async {
     final newName = _nameController.text.trim();
-    bool hasError = false;
+    // final newEmail = _emailController.text.trim();
 
     if (newName.length < 5) {
       setState(() => _nameError = true);
-      hasError = true;
-    } else {
-      setState(() => _nameError = false);
+      return;
     }
-
-    if (hasError) return;
+    setState(() => _nameError = false);
 
     try {
+      print('Token: "${userState.token}"');
       final dio = Dio();
       await dio.put(
         'https://plant-pules-api.vercel.app/api/v1/users/profile',
-        data: {'name': newName},
+        data: {
+          'name': newName,
+          'gender': _selectedGender,
+          'email': _emailController.text.trim(),
+        },
         options: Options(headers: {'token': userState.token}),
       );
 
       widget.onSave(newName);
       userState.updateFullName(newName);
+      userState.updateEmail(_emailController.text.trim());
       userState.updateGender(_selectedGender);
 
       if (!mounted) return;
@@ -448,13 +945,13 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         textColor: Colors.white,
         fontSize: 14,
       );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to update profile. Please try again.'),
-          backgroundColor: Color(0xFFD32F2F),
-        ),
+      print('Update error: $e');
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(content: Text(e.toString())),
       );
     }
   }
@@ -485,12 +982,19 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               const SizedBox(height: 24),
               Stack(
                 children: [
-                  ClipOval(
-                    child: userState.profileImagePath != null
+                  Container(
+                    width: size.width * 0.24,
+                    height: size.height * 0.111,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFFEEEEEE),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child:
+                        (userState.profileImagePath != null &&
+                            userState.profileImagePath!.isNotEmpty)
                         ? Image.file(
                             File(userState.profileImagePath!),
-                            width: size.width * 0.24,
-                            height: size.height * 0.111,
                             fit: BoxFit.cover,
                             cacheWidth: imgW,
                           )
@@ -498,8 +1002,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                             _selectedGender.toLowerCase() == 'female'
                                 ? 'assets/bigProfilePic.png'
                                 : 'assets/male.png',
-                            width: size.width * 0.24,
-                            height: size.height * 0.111,
                             fit: BoxFit.cover,
                             cacheWidth: imgW,
                           ),
@@ -539,17 +1041,16 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 label: 'Email',
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
-                hasError: _emailError,
+                hasError: false,
                 enabled: false,
-                errorText: 'Enter a valid email',
-                onClearError: () => setState(() => _emailError = false),
+                errorText: '',
+                onClearError: () {},
               ),
               const SizedBox(height: 24),
-
-              Row(
+              const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
+                  Text(
                     "Gender",
                     style: TextStyle(
                       fontSize: 14,
@@ -559,7 +1060,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -567,22 +1067,18 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   ChoiceChip(
                     label: const Text("Male"),
                     selected: _selectedGender == "male",
-                    onSelected: (_) {
-                      setState(() => _selectedGender = "male");
-                    },
+                    onSelected: (_) => setState(() => _selectedGender = "male"),
                   ),
                   const SizedBox(width: 10),
                   ChoiceChip(
                     label: const Text("Female"),
                     selected: _selectedGender == "female",
-                    onSelected: (_) {
-                      setState(() => _selectedGender = "female");
-                    },
+                    onSelected: (_) =>
+                        setState(() => _selectedGender = "female"),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -659,9 +1155,11 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               color: Color(0xFF676767),
               fontFamily: 'Poppins',
             ),
-            suffixIcon: const Icon(
-              Icons.edit_outlined,
-              color: Color(0xFF399B25),
+            suffixIcon: Icon(
+              enabled ? Icons.edit_outlined : Icons.lock_outline,
+              color: enabled
+                  ? const Color(0xFF399B25)
+                  : const Color(0xFF9E9E9E),
               size: 20,
             ),
             enabledBorder: OutlineInputBorder(

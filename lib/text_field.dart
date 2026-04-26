@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class Textfield extends StatefulWidget {
+class Text_field extends StatefulWidget {
   final String title;
   final String hintText;
   final bool isPassword;
@@ -10,7 +10,7 @@ class Textfield extends StatefulWidget {
   final String? Function(String?)? validator;
   final bool enabled;
 
-  const Textfield({
+  const Text_field({
     super.key,
     required this.title,
     required this.hintText,
@@ -23,10 +23,10 @@ class Textfield extends StatefulWidget {
   });
 
   @override
-  State<Textfield> createState() => _TextfieldState();
+  State<Text_field> createState() => _Text_fieldState();
 }
 
-class _TextfieldState extends State<Textfield> {
+class _Text_fieldState extends State<Text_field> {
   bool _passwordHidden = true;
 
   @override

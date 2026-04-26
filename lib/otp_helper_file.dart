@@ -9,7 +9,7 @@ class OTPHelper extends StatefulWidget {
   final String body;
   final bool isEmail;
   final String buttonText;
-  final void Function(String email) onPress; // ✅ بيبعت الـ email
+  final void Function(String email) onPress;
 
   const OTPHelper({
     super.key,

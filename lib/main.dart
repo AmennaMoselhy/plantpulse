@@ -7,7 +7,7 @@ import 'login.dart';
 import 'onboarding.dart';
 import 'recent_scan.dart';
 import 'register.dart';
-import 'resultpage.dart';
+import 'result_page.dart';
 import 'scan.dart';
 import 'send_otp.dart';
 import 'user_state.dart';
@@ -27,7 +27,6 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(fontFamily: 'Poppins', useMaterial3: true),
       home: const _StartupScreen(),
       routes: {
-        'HomePage': (_) => const HomePage(),
         'Login': (_) => const Login(),
         'Change_Password': (_) => const ChangePassword(),
         'OnBoardingScreen': (_) => const OnBoardingScreen(),
@@ -36,12 +35,17 @@ class MyApp extends StatelessWidget {
         'Send_OTP': (_) => const SendOTP(),
         'ScanPage': (_) => const Scan(),
         'RecentScan': (_) => const RecentScan(),
-        'ResultPage': (_) => ResultPage(
-          imagePath: '',
-          plantName: 'Lettuce',
-          status: 'Healthy',
-          confidence: '—',
-        ),
+        'HomePage': (_) => const HomePage(),
+        'ResultPage': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments
+          as Map<String, dynamic>?;
+          return ResultPage(
+            imagePath: args?['imagePath'] ?? '',
+            plantName: args?['plantName'] ?? 'Lettuce',
+            status: args?['status'] ?? 'Healthy',
+            confidence: args?['confidence'] ?? '—',
+          );
+        },
       },
     );
   }
@@ -62,8 +66,24 @@ class _StartupScreenState extends State<_StartupScreen> {
   }
 
   Future<void> _navigate() async {
-    await loadScans();
     final prefs = await SharedPreferences.getInstance();
+
+    // On fresh install: install_token won't exist.
+    // Only clear login-related keys — preserve 'seen' so onboarding
+    // doesn't show again on reinstall for returning users.
+    final installToken = prefs.getString('install_token');
+    if (installToken == null) {
+      await prefs.remove('savedToken');
+      await prefs.remove('savedEmail');
+      await prefs.remove('savedFullName');
+      await prefs.remove('savedPassword');
+      await prefs.remove('savedGender');
+      await prefs.remove('savedImagePath');
+      await prefs.remove('recentScans');
+      await prefs.setBool('isLoggedIn', false);
+      await prefs.setString('install_token', DateTime.now().toIso8601String());
+    }
+
     final seen = prefs.getBool('seen') ?? false;
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
 
@@ -76,6 +96,11 @@ class _StartupScreenState extends State<_StartupScreen> {
 
     if (isLoggedIn) {
       await userState.loadPersistedData();
+
+      // Load local cache first for instant display, then sync from server
+      await loadScans();
+      loadScansFromApi(userState.token);
+
       if (!mounted) return;
       Navigator.pushReplacementNamed(
         context,
@@ -85,8 +110,7 @@ class _StartupScreenState extends State<_StartupScreen> {
               ? userState.fullName.split(' ')[0]
               : '',
           'fullName': userState.fullName,
-          'email': userState.email,
-          'password': '',
+          'gender': userState.gender,
         },
       );
       return;

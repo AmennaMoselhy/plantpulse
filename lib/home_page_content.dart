@@ -1,8 +1,9 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'user_state.dart';
 import 'recent_scan.dart';
-import 'resultpage.dart';
+import 'result_page.dart';
 
 class HomePageContent extends StatefulWidget {
   final String firstName;
@@ -21,11 +22,46 @@ class HomePageContent extends StatefulWidget {
 }
 
 class _HomePageContentState extends State<HomePageContent> {
+  int _totalScans = 0;
+  int _healthyScans = 0;
+  int _diseasedScans = 0;
+  bool _statsLoaded = false;
+
   @override
   void initState() {
     super.initState();
     userState.addListener(_onStateChanged);
     scansState.addListener(_onStateChanged);
+    _loadStats();
+    _syncScansWithApi();
+  }
+
+  Future<void> _loadStats() async {
+    final scans = scansState.scans;
+    if (mounted) {
+      setState(() {
+        _totalScans = scans.length;
+        _healthyScans = scans.where((s) => s.status == 'Healthy').length;
+        _diseasedScans = scans.where((s) => s.status == 'Diseased').length;
+        _statsLoaded = true;
+      });
+    }
+  }
+
+  Future<void> _syncScansWithApi() async {
+    try {
+      final dio = Dio();
+      final response = await dio.get(
+        'https://plant-pules-api.vercel.app/api/v1/scan',
+        options: Options(headers: {'token': userState.token}),
+      );
+      final List data = response.data['data'] ?? [];
+      final records = data
+          .map((item) => ScanRecord.fromJson(item as Map<String, dynamic>))
+          .toList();
+      scansState.setAll(records);
+      await saveScans();
+    } catch (_) {}
   }
 
   void _onStateChanged() {
@@ -49,6 +85,14 @@ class _HomePageContentState extends State<HomePageContent> {
     final size = MediaQuery.of(context).size;
     final scans = scansState.scans;
     final latestTwo = scans.reversed.take(2).toList();
+
+    final totalVal = _statsLoaded ? _totalScans : scans.length;
+    final healthyVal = _statsLoaded
+        ? _healthyScans
+        : scans.where((s) => s.status == 'Healthy').length;
+    final diseasedVal = _statsLoaded
+        ? _diseasedScans
+        : scans.where((s) => s.status == 'Diseased').length;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -74,7 +118,7 @@ class _HomePageContentState extends State<HomePageContent> {
           _buildStatCard(
             imagePath: 'assets/totalScans.png',
             label: 'Total Scans',
-            value: '${scans.length}',
+            value: '$totalVal',
             bgColor: const Color(0xFFEBF5E9),
             borderColor: const Color(0xFF61AF51),
           ),
@@ -85,7 +129,7 @@ class _HomePageContentState extends State<HomePageContent> {
                 child: _buildStatCard(
                   imagePath: 'assets/health.png',
                   label: 'Healthy',
-                  value: '${scans.where((s) => s.status == 'Healthy').length}',
+                  value: '$healthyVal',
                   bgColor: const Color(0xFFEBF5E9),
                   borderColor: const Color(0xFF61AF51),
                 ),
@@ -95,7 +139,7 @@ class _HomePageContentState extends State<HomePageContent> {
                 child: _buildStatCard(
                   imagePath: 'assets/disease.png',
                   label: 'Diseased',
-                  value: '${scans.where((s) => s.status == 'Diseased').length}',
+                  value: '$diseasedVal',
                   bgColor: const Color(0xFFFFF4E9),
                   borderColor: const Color(0xFFFFA352),
                 ),
@@ -148,9 +192,7 @@ class _HomePageContentState extends State<HomePageContent> {
               ),
             )
           else
-            ...latestTwo.map(
-              (scan) => _MiniScanItem(scan: scan),
-            ),
+            ...latestTwo.map((scan) => _MiniScanItem(scan: scan)),
           const SizedBox(height: 16),
           _buildDidYouKnow(),
           const Spacer(),
@@ -186,25 +228,33 @@ class _HomePageContentState extends State<HomePageContent> {
         const Spacer(),
         GestureDetector(
           onTap: widget.onProfileTap,
-          child: ClipOval(
-            child: userState.profileImagePath != null
-                ? Image.file(
+          child:
+              userState.profileImagePath != null &&
+                  userState.profileImagePath!.isNotEmpty
+              ? ClipOval(
+                  child: Image.file(
                     File(userState.profileImagePath!),
                     width: 32,
                     height: 32,
                     fit: BoxFit.cover,
                     cacheWidth: 64,
-                  )
-                : Image.asset(
+                  ),
+                )
+              : Container(
+                  width: 34,
+                  height: 34,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color:  Color(0xFFEFF3EE),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.asset(
                     userState.gender.toLowerCase() == 'female'
                         ? 'assets/bigProfilePic.png'
                         : 'assets/male.png',
-                    width: 34,
-                    height: 32,
                     fit: BoxFit.cover,
-                    cacheWidth: 64,
                   ),
-          ),
+                ),
         ),
       ],
     );
@@ -335,6 +385,9 @@ class _MiniScanItem extends StatelessWidget {
             confidence: scan.confidence,
             imageUrl: scan.imageUrl,
             fromRecentScan: true,
+            diseaseName: scan.diseaseName,
+            description: scan.description,
+            treatment: scan.treatment,
           ),
         ),
       ),

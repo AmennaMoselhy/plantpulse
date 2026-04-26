@@ -94,6 +94,7 @@ class _RegisterFormState extends State<_RegisterForm> {
     final password = _passwordController.text;
 
     if (_gender == null) {
+      setState(() => _isLoading = false);
       _showError('Please select gender');
       return;
     }
@@ -107,6 +108,7 @@ class _RegisterFormState extends State<_RegisterForm> {
           'email': email,
           'password': password,
           'confirmPassword': password,
+          'gender': _gender!,
         },
         options: Options(
           receiveTimeout: const Duration(seconds: 15),
@@ -129,15 +131,87 @@ class _RegisterFormState extends State<_RegisterForm> {
 
       if (!mounted) return;
 
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        'HomePage',
-        (route) => false,
-        arguments: {
-          'firstName': firstName,
-          'fullName': fullName,
-          'email': email,
-          'gender': _gender,
-        },
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE8F5E9),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: Color(0xFF399B25),
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Account Created!',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Poppins',
+                  color: Color(0xFF1F1F1F),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Your account has been created successfully.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontFamily: 'Poppins',
+                  color: Color(0xFF717171),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      'Login',
+                          (route) => false,
+                      arguments: {
+                        'email': email,
+                        'password': password,
+                      },
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF399B25),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Go to Login',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     } on DioException catch (e) {
       final msg = e.response?.data?['message'] ?? 'Registration failed';
@@ -175,7 +249,7 @@ class _RegisterFormState extends State<_RegisterForm> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Textfield(
+            Text_field(
               controller: _nameController,
               keyboardType: TextInputType.name,
               title: 'Name',
@@ -183,7 +257,7 @@ class _RegisterFormState extends State<_RegisterForm> {
               validator: _validateName,
             ),
             SizedBox(height: size.height * 0.005),
-            Textfield(
+            Text_field(
               title: 'Email',
               hintText: 'Enter Your Email',
               keyboardType: TextInputType.emailAddress,
@@ -191,7 +265,7 @@ class _RegisterFormState extends State<_RegisterForm> {
               validator: _validateEmail,
             ),
             SizedBox(height: size.height * 0.005),
-            Textfield(
+            Text_field(
               title: 'Password',
               controller: _passwordController,
               hintText: 'Enter Your Password',
@@ -200,7 +274,7 @@ class _RegisterFormState extends State<_RegisterForm> {
               validator: _validatePassword,
             ),
             SizedBox(height: size.height * 0.005),
-            Textfield(
+            Text_field(
               controller: _confirmPasswordController,
               title: 'Confirm Password',
               hintText: 'Enter Your Password',
@@ -223,7 +297,7 @@ class _RegisterFormState extends State<_RegisterForm> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         color: _gender == 'male'
-                            ? const Color(0xFF399B25).withOpacity(0.1)
+                            ? const Color(0xFF399B25).withValues(alpha: 0.1)
                             : Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
@@ -260,7 +334,7 @@ class _RegisterFormState extends State<_RegisterForm> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         color: _gender == 'female'
-                            ? const Color(0xFF399B25).withOpacity(0.1)
+                            ? const Color(0xFF399B25).withValues(alpha: 0.1)
                             : Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(

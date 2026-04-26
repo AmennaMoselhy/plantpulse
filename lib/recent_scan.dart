@@ -2,8 +2,9 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'resultpage.dart';
+import 'result_page.dart';
 import 'package:dio/dio.dart';
+import 'user_state.dart';
 
 class ScanRecord {
   final String imagePath;
@@ -11,8 +12,10 @@ class ScanRecord {
   final String? imageUrl;
   final String confidence;
   final String status;
-
   final DateTime scanTime;
+  final String? diseaseName;
+  final String? description;
+  final String? treatment;
 
   ScanRecord({
     required this.imagePath,
@@ -21,7 +24,47 @@ class ScanRecord {
     this.imageUrl,
     required this.status,
     required this.scanTime,
+    this.diseaseName,
+    this.description,
+    this.treatment,
   });
+
+  factory ScanRecord.fromJson(Map<String, dynamic> json) {
+    final images = json['imageUrl'] as List?;
+    final imageUrl = (images != null && images.isNotEmpty)
+        ? images.first as String
+        : null;
+
+    final decision = (json['finalDecision'] ?? '').toString().toLowerCase();
+    final rawConf = json['averageConfidence'] ?? json['confidence'] ?? 0;
+    final confidence = (rawConf is num)
+        ? rawConf.toStringAsFixed(0)
+        : rawConf.toString();
+
+    DateTime scanTime;
+    try {
+      scanTime = DateTime.parse(json['createdAt'] as String);
+    } catch (_) {
+      scanTime = DateTime.now();
+    }
+
+    final results = json['results'] as List?;
+    final firstResult = results?.isNotEmpty == true ? results!.first : null;
+
+    return ScanRecord(
+      imagePath: '',
+      imageUrl: imageUrl,
+      plantName: 'Lettuce',
+      status: decision == 'healthy' ? 'Healthy' : 'Diseased',
+      confidence: confidence,
+      scanTime: scanTime,
+      diseaseName: firstResult?['disease_name'] as String?,
+      description: firstResult?['description'] as String?,
+      treatment: firstResult?['treatment'] is List
+          ? (firstResult!['treatment'] as List).join('|||')
+          : firstResult?['treatment'] as String?,
+    );
+  }
 }
 
 class ScansState extends ChangeNotifier {
@@ -71,6 +114,9 @@ Future<void> saveScans() async {
           'status': s.status,
           'confidence': s.confidence,
           'scanTime': s.scanTime.toIso8601String(),
+          'diseaseName': s.diseaseName ?? '',
+          'description': s.description ?? '',
+          'treatment': s.treatment ?? '',
         },
       )
       .toList();
@@ -93,12 +139,40 @@ Future<void> loadScans() async {
               confidence: s['confidence'] ?? '—',
               status: s['status'],
               scanTime: DateTime.parse(s['scanTime']),
+              diseaseName: s['diseaseName'],
+              description: s['description'],
+              treatment: s['treatment'],
             ),
           )
           .toList(),
     );
   } catch (_) {
     scansState.clear();
+  }
+}
+
+Future<void> loadScansFromApi(String token) async {
+  if (token.isEmpty) return;
+  try {
+    final dio = Dio();
+    final response = await dio.get(
+      'https://plant-pules-api.vercel.app/api/v1/scan/recent',
+      options: Options(headers: {'token': token}),
+    );
+    print('API response: ${response.data}');
+
+    final List data = response.data['data'] ?? [];
+    print('Data length: ${data.length}');
+
+    final apiScans = data
+        .map((s) => ScanRecord.fromJson(s as Map<String, dynamic>))
+        .toList();
+
+    scansState.setAll(apiScans);
+    print('Scans set: ${scansState.length}');
+    await saveScans();
+  } catch (e) {
+    print('loadScansFromApi error: $e');
   }
 }
 
@@ -110,10 +184,20 @@ class RecentScan extends StatefulWidget {
 }
 
 class _RecentScanState extends State<RecentScan> {
+  bool _loadingFromApi = false;
+
   @override
   void initState() {
     super.initState();
     scansState.addListener(_onScansChanged);
+    _syncFromApi();
+  }
+
+  Future<void> _syncFromApi() async {
+    if (userState.token.isEmpty) return;
+    setState(() => _loadingFromApi = true);
+    await loadScansFromApi(userState.token);
+    if (mounted) setState(() => _loadingFromApi = false);
   }
 
   void _onScansChanged() {
@@ -221,7 +305,14 @@ class _RecentScanState extends State<RecentScan> {
             ),
             const SizedBox(height: 24),
             Expanded(
-              child: scansState.isEmpty
+              child: _loadingFromApi && scansState.isEmpty
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF399B25),
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : scansState.isEmpty
                   ? const Center(
                       child: Text(
                         'No scans yet',
@@ -309,8 +400,12 @@ class _ScanItem extends StatelessWidget {
             imagePath: scan.imagePath,
             plantName: scan.plantName,
             status: scan.status,
-            confidence: '—',
+            confidence: scan.confidence,
             imageUrl: scan.imageUrl,
+            fromRecentScan: true,
+            diseaseName: scan.diseaseName,
+            description: scan.description,
+            treatment: scan.treatment,
           ),
         ),
       ),
@@ -384,7 +479,7 @@ class _ScanItem extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
-                      color: Color(0XFF4A4A4A),
+                      color: Color(0xFF4A4A4A),
                       fontFamily: 'Poppins',
                     ),
                   ),
@@ -431,34 +526,4 @@ class _ScanItem extends StatelessWidget {
       ),
     );
   }
-}
-
-Future<void> loadScansFromApi(String token) async {
-  try {
-    final dio = Dio();
-    final response = await dio.get(
-      'https://plant-pules-api.vercel.app/api/v1/scan/recent',
-      options: Options(headers: {'token': token}),
-    );
-
-    final List data = response.data['data'] ?? [];
-    final apiScans = data.map((s) {
-      final images = s['imageUrl'] as List?;
-      final imageUrl = images != null && images.isNotEmpty
-          ? images.first as String
-          : '';
-      final decision = (s['finalDecision'] as String? ?? '').toLowerCase();
-      return ScanRecord(
-        imagePath: '',
-        imageUrl: imageUrl,
-        plantName: 'Lettuce',
-        status: decision == 'healthy' ? 'Healthy' : 'Diseased',
-        scanTime: DateTime.parse(s['createdAt']),
-        confidence: (s['confidence'] ?? '—').toString(),
-      );
-    }).toList();
-
-    scansState.setAll(apiScans);
-    await saveScans();
-  } catch (_) {}
 }
