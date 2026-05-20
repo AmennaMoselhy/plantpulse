@@ -23,7 +23,7 @@ class _LoginState extends State<Login> {
   bool _isLoading = false;
 
   static final _emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$');
-  static const _sign_inUrl =
+  static const _signInUrl  =
       'https://plant-pules-api.vercel.app/api/v1/auth/signin';
 
   @override
@@ -70,7 +70,7 @@ class _LoginState extends State<Login> {
     try {
       final dio = Dio();
       final response = await dio.post(
-        _sign_inUrl,
+        _signInUrl ,
         data: {'email': email, 'password': password},
         options: Options(
           receiveTimeout: const Duration(seconds: 15),
@@ -85,7 +85,6 @@ class _LoginState extends State<Login> {
       }
 
       await userState.saveToken(token);
-      print('Token after saveToken: ${userState.token}');
 
       String fullName = '';
       String gender = 'male';
@@ -114,10 +113,8 @@ class _LoginState extends State<Login> {
         fullName: fullName,
         gender: gender,
       );
-      print('Token after saveUserData: ${userState.token}');
 
       await loadScansFromApi(token);
-      print('Scans after login: ${scansState.length}');
 
 
       if (!mounted) return;
@@ -176,69 +173,71 @@ class _LoginState extends State<Login> {
             SizedBox(height: size.height * 0.0355),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: size.width * 0.064),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text_field(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    title: 'Email',
-                    hintText: 'Enter Your Email',
-                    validator: _validateEmail,
-                  ),
-                  SizedBox(height: size.height * 0.019),
-                  Text_field(
-                    controller: _passwordController,
-                    keyboardType: TextInputType.visiblePassword,
-                    title: 'Password',
-                    hintText: 'Enter Your Password',
-                    isPassword: true,
-                    validator: _validatePassword,
-                  ),
-                  SizedBox(height: size.height * 0.0099),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () =>
-                          Navigator.of(context).pushNamed('Forget_Password'),
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: const Text(
-                        'Forgot Password?',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w400,
-                          fontFamily: 'Poppins',
-                          fontSize: 12,
-                          color: Color(0xFF399B25),
+              child: AutofillGroup(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppTextField (
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      title: 'Email',
+                      hintText: 'Enter Your Email',
+                      validator: _validateEmail,
+                    ),
+                    SizedBox(height: size.height * 0.019),
+                    AppTextField (
+                      controller: _passwordController,
+                      keyboardType: TextInputType.visiblePassword,
+                      title: 'Password',
+                      hintText: 'Enter Your Password',
+                      isPassword: true,
+                      validator: _validatePassword,
+                    ),
+                    SizedBox(height: size.height * 0.0099),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () =>
+                            Navigator.of(context).pushNamed('Forget_Password'),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          'Forgot Password?',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w400,
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            color: Color(0xFF399B25),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  SizedBox(height: size.height * 0.0394),
-                  _isLoading
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            color: Color(0xFF399B25),
-                          ),
-                        )
-                      : GreenButton(text: 'Log in', onPress: _handleLogin),
-                  SizedBox(height: size.height * 0.0394),
-                  LoginWithFaceBook(
-                    onEmailSelected: (email) {
-                      _emailController.text = email;
-                    },
-                  ),
-                  SizedBox(height: size.height * 0.1),
-                  DownText(
-                    label: "Don't have an account?",
-                    actionText: 'Register',
-                    onTap: () => Navigator.of(context).pushNamed('Register'),
-                  ),
-                  SizedBox(height: size.height * 0.03),
-                ],
+                    SizedBox(height: size.height * 0.0394),
+                    _isLoading
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF399B25),
+                            ),
+                          )
+                        : GreenButton(text: 'Log in', onPress: _handleLogin),
+                    SizedBox(height: size.height * 0.0394),
+                    LoginWithFaceBook(
+                      onEmailSelected: (email) {
+                        _emailController.text = email;
+                      },
+                    ),
+                    SizedBox(height: size.height * 0.1),
+                    DownText(
+                      label: "Don't have an account?",
+                      actionText: 'Register',
+                      onTap: () => Navigator.of(context).pushNamed('Register'),
+                    ),
+                    SizedBox(height: size.height * 0.03),
+                  ],
+                ),
               ),
             ),
           ],

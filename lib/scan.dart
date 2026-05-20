@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'scan_processing.dart';
+import 'crop_screen.dart';
+import 'package:flutter/services.dart';
+import 'package:vibration/vibration.dart';
 
 class Scan extends StatefulWidget {
   const Scan({super.key});
@@ -19,10 +22,22 @@ class _ScanState extends State<Scan> {
       final XFile? image = await _picker.pickImage(source: source);
       if (image == null || !mounted) return;
 
+      final bytes = await image.readAsBytes();
+      if (!mounted) return;
+
+      final croppedBytes = await Navigator.push<Uint8List>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CropScreen(imageBytes: bytes, isProfile: false),
+        ),
+      );
+
+      if (croppedBytes == null || !mounted) return;
+
       final tempDir = await getTemporaryDirectory();
-      final String newPath =
+      final newPath =
           '${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await File(image.path).copy(newPath);
+      await File(newPath).writeAsBytes(croppedBytes);
 
       if (!mounted) return;
       Navigator.push(
@@ -98,7 +113,14 @@ class _ScanState extends State<Scan> {
               _buildButton(
                 label: 'Start Scan',
                 icon: Image.asset("assets/qrcode.png", height: 24, width: 24),
-                onPressed: () => _pickImage(ImageSource.camera),
+                onPressed: () async {
+                  if (await Vibration.hasVibrator() == true) {
+                    Vibration.vibrate(duration: 100);
+                  } else {
+                    HapticFeedback.mediumImpact();
+                  }
+                  _pickImage(ImageSource.camera);
+                },
                 backgroundColor: const Color(0XFF399B25),
                 textColor: Colors.white,
                 isOutlined: false,
@@ -111,7 +133,14 @@ class _ScanState extends State<Scan> {
                   size: 24,
                   color: Color(0xFF399B25),
                 ),
-                onPressed: () => _pickImage(ImageSource.gallery),
+                onPressed: () async {
+                  if (await Vibration.hasVibrator() == true) {
+                    Vibration.vibrate(duration: 50);
+                  } else {
+                    HapticFeedback.lightImpact();
+                  }
+                  _pickImage(ImageSource.gallery);
+                },
                 backgroundColor: Colors.white,
                 textColor: const Color(0xFF399B25),
                 isOutlined: true,

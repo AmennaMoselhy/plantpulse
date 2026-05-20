@@ -6,11 +6,17 @@ import 'package:path_provider/path_provider.dart';
 import 'change_password_sheet.dart';
 import 'logout_sheet.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 import 'user_state.dart';
 import 'recent_scan.dart';
 import 'contact_us_sheet.dart';
+import 'crop_screen.dart';
+import 'package:vibration/vibration.dart';
+import 'app_navigator.dart';
+import 'legal_page.dart';
+import 'faq_page.dart';
 
-Future<bool?> showSavePhotoDialog(BuildContext ctx, String imagePath) {
+Future<bool?> showSavePhotoDialog(BuildContext ctx, Uint8List imageBytes) {
   return showDialog<bool>(
     context: ctx,
     builder: (dialogCtx) => AlertDialog(
@@ -29,8 +35,8 @@ Future<bool?> showSavePhotoDialog(BuildContext ctx, String imagePath) {
         mainAxisSize: MainAxisSize.min,
         children: [
           ClipOval(
-            child: Image.file(
-              File(imagePath),
+            child: Image.memory(
+              imageBytes,
               width: 100,
               height: 100,
               fit: BoxFit.cover,
@@ -128,6 +134,36 @@ class Profile extends StatefulWidget {
 class _ProfileState extends State<Profile> {
   late String _displayName;
 
+  void _showFullScreenPhoto(BuildContext context) {
+    final hasPhoto =
+        userState.profileImagePath != null &&
+        userState.profileImagePath!.isNotEmpty;
+
+    Navigator.push(
+      context,
+      fadeSlideRoute(
+        _FullScreenPhotoPage(
+          imagePath: hasPhoto ? userState.profileImagePath! : null,
+          gender: userState.gender,
+          onEditTap: () {
+            Navigator.of(context).pop();
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (mounted) _pickProfileImage();
+            });
+          },
+          onDeleteTap: hasPhoto
+              ? () {
+                  Navigator.of(context).pop();
+                  Future.delayed(const Duration(milliseconds: 300), () {
+                    if (mounted) _confirmRemovePhoto();
+                  });
+                }
+              : null,
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -160,17 +196,28 @@ class _ProfileState extends State<Profile> {
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
 
+    final bytes = await image.readAsBytes();
     if (!mounted) return;
-    final confirmed = await showSavePhotoDialog(context, image.path);
+
+    final croppedBytes = await Navigator.push<Uint8List>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CropScreen(imageBytes: bytes, isProfile: true),
+      ),
+    );
+
+    if (croppedBytes == null || !mounted) return;
+
+    final confirmed = await showSavePhotoDialog(context, croppedBytes);
     if (confirmed != true || !mounted) return;
 
-    final bytes = await image.readAsBytes();
     final tempDir = await getApplicationDocumentsDirectory();
     final newPath =
         '${tempDir.path}/profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    await File(newPath).writeAsBytes(bytes);
+    await File(newPath).writeAsBytes(croppedBytes);
     userState.updateProfileImage(newPath);
     await uploadProfileImage(newPath);
+    if (mounted) setState(() {});
   }
 
   void _showPhotoOptionsSheet() {
@@ -230,7 +277,13 @@ class _ProfileState extends State<Profile> {
                 title: 'Remove photo',
                 subtitle: 'Reset to default picture',
                 titleColor: const Color(0xFFD32F2F),
-                onTap: () {
+                onTap: () async {
+                  if (await Vibration.hasVibrator() == true) {
+                    Vibration.vibrate(duration: 50);
+                  } else {
+                    HapticFeedback.mediumImpact();
+                  }
+                  if (!ctx.mounted) return;
                   Navigator.pop(ctx);
                   _confirmRemovePhoto();
                 },
@@ -487,8 +540,8 @@ class _ProfileState extends State<Profile> {
                 ],
               ),
               const SizedBox(height: 24),
-              // Profile image with long press to show options
               GestureDetector(
+                onTap: () => _showFullScreenPhoto(context),
                 onLongPress: _showPhotoOptionsSheet,
                 child: Stack(
                   children: [
@@ -561,19 +614,36 @@ class _ProfileState extends State<Profile> {
               ),
               const SizedBox(height: 16),
               _buildMenuItem(
-                icon: 'profile-circle',
+                icon: 'contact-us',
                 label: 'Contact Us',
-                onTap: () => showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  useSafeArea: true,
-                  backgroundColor: Colors.white,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(24),
+                onTap: () async {
+                  if (await Vibration.hasVibrator() == true) {
+                    Vibration.vibrate(duration: 30);
+                  } else {
+                    HapticFeedback.lightImpact();
+                  }
+                  if (!context.mounted) return;
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    backgroundColor: Colors.white,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(24),
+                      ),
                     ),
-                  ),
-                  builder: (context) => const ContactUsSheet(),
+                    builder: (context) => const ContactUsSheet(),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              _buildMenuItem(
+                icon: 'faq',
+                label: 'FAQ',
+                onTap: () => Navigator.push(
+                  context,
+                  fadeSlideRoute(const FaqPage()),
                 ),
               ),
               const SizedBox(height: 16),
@@ -581,18 +651,27 @@ class _ProfileState extends State<Profile> {
                 icon: 'logout',
                 label: 'Logout',
                 isLogout: true,
-                onTap: () => showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  useSafeArea: true,
-                  backgroundColor: Colors.white,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(24),
+                onTap: () {
+                  Vibration.hasVibrator().then((hasVibrator) {
+                    if (hasVibrator == true) {
+                      Vibration.vibrate(duration: 30);
+                    } else {
+                      HapticFeedback.lightImpact();
+                    }
+                  });
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    backgroundColor: Colors.white,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(24),
+                      ),
                     ),
-                  ),
-                  builder: (context) => const LogoutSheet(),
-                ),
+                    builder: (context) => const LogoutSheet(),
+                  );
+                },
               ),
             ],
           ),
@@ -618,7 +697,12 @@ class _ProfileState extends State<Profile> {
         ),
         child: Row(
           children: [
-            Image.asset('assets/$icon.png', width: 24, height: 24),
+            Image.asset(
+              'assets/$icon.png',
+              width: 24,
+              height: 24,
+              color: isLogout ? const Color(0xFFD32F2F) : const Color(0xFF399B25),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -733,6 +817,7 @@ class _AccountSettingsSheetState extends State<_AccountSettingsSheet> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -748,6 +833,47 @@ class _AccountSettingsSheetState extends State<_AccountSettingsSheet> {
             ),
           ),
           const SizedBox(height: 24),
+          GestureDetector(
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, fadeSlideRoute(const LegalPage()));
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F5F5),
+                border: Border.all(color: const Color(0xFFCCCCCC), width: 0.4),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.privacy_tip_outlined,
+                    color: Color(0xFF399B25),
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Privacy & Terms',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Poppins',
+                        color: Color(0xFF184110),
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 19,
+                    color: Color(0xFF222222),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           GestureDetector(
             onTap: () {
               Navigator.pop(context);
@@ -799,7 +925,16 @@ class _AccountSettingsSheetState extends State<_AccountSettingsSheet> {
           ),
           const SizedBox(height: 16),
           GestureDetector(
-            onTap: _deletingAccount ? null : _handleDeleteAccount,
+            onTap: _deletingAccount
+                ? null
+                : () async {
+                    if (await Vibration.hasVibrator() == true) {
+                      Vibration.vibrate(duration: 100);
+                    } else {
+                      HapticFeedback.heavyImpact();
+                    }
+                    _handleDeleteAccount();
+                  },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
@@ -892,15 +1027,25 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
 
+    final bytes = await image.readAsBytes();
     if (!mounted) return;
-    final confirmed = await showSavePhotoDialog(context, image.path);
+
+    final croppedBytes = await Navigator.push<Uint8List>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CropScreen(imageBytes: bytes, isProfile: true),
+      ),
+    );
+
+    if (croppedBytes == null || !mounted) return;
+
+    final confirmed = await showSavePhotoDialog(context, croppedBytes);
     if (confirmed != true || !mounted) return;
 
-    final bytes = await image.readAsBytes();
     final tempDir = await getApplicationDocumentsDirectory();
     final newPath =
         '${tempDir.path}/profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    await File(newPath).writeAsBytes(bytes);
+    await File(newPath).writeAsBytes(croppedBytes);
     userState.updateProfileImage(newPath);
     await uploadProfileImage(newPath);
     if (mounted) setState(() {});
@@ -917,7 +1062,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     setState(() => _nameError = false);
 
     try {
-      print('Token: "${userState.token}"');
       final dio = Dio();
       await dio.put(
         'https://plant-pules-api.vercel.app/api/v1/users/profile',
@@ -947,11 +1091,15 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       );
     } catch (e) {
       if (!mounted) return;
-      print('Update error: $e');
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(content: Text(e.toString())),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Something went wrong. Please try again.',
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 13),
+          ),
+          backgroundColor: Color(0xFFD32F2F),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
   }
@@ -1083,7 +1231,15 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
-                  onPressed: _handleSave,
+                  onPressed: () async {
+                    if (await Vibration.hasVibrator() == true) {
+                      Vibration.vibrate(duration: 50);
+                    } else {
+                      HapticFeedback.mediumImpact();
+                    }
+                    if (!context.mounted) return;
+                    _handleSave();
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF399B25),
                     elevation: 0,
@@ -1196,6 +1352,188 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
           },
         ),
       ],
+    );
+  }
+}
+
+class _FullScreenPhotoPage extends StatelessWidget {
+  final String? imagePath;
+  final String gender;
+  final VoidCallback onEditTap;
+  final VoidCallback? onDeleteTap;
+
+  const _FullScreenPhotoPage({
+    required this.imagePath,
+    required this.gender,
+    required this.onEditTap,
+    this.onDeleteTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                  ),
+                  const Expanded(
+                    child: Text(
+                      'Profile picture',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ),
+                  if (onDeleteTap != null)
+                    IconButton(
+                      onPressed: onDeleteTap,
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.white,
+                        size: 26,
+                      ),
+                    )
+                  else
+                    const SizedBox(width: 48),
+                ],
+              ),
+            ),
+
+            Expanded(
+              child: Center(
+                child: imagePath != null
+                    ? Image.file(File(imagePath!), fit: BoxFit.contain)
+                    : Image.asset(
+                        gender.toLowerCase() == 'female'
+                            ? 'assets/bigProfilePic.png'
+                            : 'assets/male.png',
+                        fit: BoxFit.contain,
+                      ),
+              ),
+            ),
+
+            Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD9D9D9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _option(
+                    icon: Icons.photo_library_outlined,
+                    iconColor: const Color(0xFF399B25),
+                    bgColor: const Color(0xFFEAF3DE),
+                    title: 'Change photo',
+                    subtitle: 'Choose from your gallery',
+                    onTap: onEditTap,
+                  ),
+                  if (onDeleteTap != null) ...[
+                    const SizedBox(height: 12),
+                    _option(
+                      icon: Icons.delete_outline,
+                      iconColor: const Color(0xFFD32F2F),
+                      bgColor: const Color(0xFFFFEBEB),
+                      title: 'Remove photo',
+                      subtitle: 'Reset to default picture',
+                      titleColor: const Color(0xFFD32F2F),
+                      onTap: onDeleteTap!,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _option({
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required String title,
+    required String subtitle,
+    Color? titleColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFCCCCCC), width: 0.4),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Poppins',
+                      color: titleColor ?? const Color(0xFF184110),
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontFamily: 'Poppins',
+                      color: Color(0xFF676767),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: titleColor ?? const Color(0xFF222222),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

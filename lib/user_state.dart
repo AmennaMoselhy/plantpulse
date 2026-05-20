@@ -30,7 +30,6 @@ class UserState extends ChangeNotifier {
     String fullName = '',
     String gender = '',
   }) async {
-    print('saveUserData token before: $_token');
     _email = email;
     _password = password;
     _fullName = fullName;

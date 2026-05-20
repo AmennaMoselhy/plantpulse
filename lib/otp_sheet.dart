@@ -26,11 +26,17 @@ class OtpSheet extends StatefulWidget {
 class _OtpSheetState extends State<OtpSheet> {
   static const int _otpLength = 6;
   static const int _timerDuration = 20;
+  String? _otpError;
+  bool _isResending = false;
 
-  final List<TextEditingController> _controllers =
-  List.generate(_otpLength, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes =
-  List.generate(_otpLength, (_) => FocusNode());
+   final List<TextEditingController> _controllers = List.generate(
+    _otpLength,
+    (_) => TextEditingController(),
+  );
+  final List<FocusNode> _focusNodes = List.generate(
+    _otpLength,
+    (_) => FocusNode(),
+  );
 
   int _secondsLeft = _timerDuration;
   Timer? _timer;
@@ -56,7 +62,8 @@ class _OtpSheetState extends State<OtpSheet> {
   }
 
   Future<void> _onResendTap() async {
-    if (_secondsLeft > 0) return;
+    if (_secondsLeft > 0 || _isResending) return;
+    setState(() => _isResending = true);
     try {
       final dio = Dio();
       await dio.post(
@@ -83,6 +90,8 @@ class _OtpSheetState extends State<OtpSheet> {
         textColor: Colors.white,
         fontSize: 14,
       );
+    } finally {
+      if (mounted) setState(() => _isResending = false);
     }
   }
 
@@ -94,6 +103,7 @@ class _OtpSheetState extends State<OtpSheet> {
     }
     setState(() {
       _isComplete = _controllers.every((c) => c.text.isNotEmpty);
+      _otpError = null;
     });
   }
 
@@ -112,16 +122,15 @@ class _OtpSheetState extends State<OtpSheet> {
       if (widget.newPassword != null) {
         await dio.post(
           'https://plant-pules-api.vercel.app/api/v1/password/reset-password',
-          data: {
-            'email': widget.email,
-            'newPassword': widget.newPassword,
-          },
+          data: {'email': widget.email, 'newPassword': widget.newPassword},
         );
 
         await userState.updatePassword(widget.newPassword!);
 
         if (!mounted) return;
-        Navigator.of(context).popUntil((route) => route.isFirst || route.settings.name == 'HomePage');
+        Navigator.of(context).popUntil(
+          (route) => route.isFirst || route.settings.name == 'HomePage',
+        );
 
         Fluttertoast.showToast(
           msg: 'Password changed successfully',
@@ -147,23 +156,14 @@ class _OtpSheetState extends State<OtpSheet> {
           builder: (_) => const ResetPasswordSheet(),
         );
       } else {
-        Navigator.of(context).pushNamed(
-          'Change_Password',
-          arguments: {'email': widget.email},
-        );
+        Navigator.of(
+          context,
+        ).pushNamed('Change_Password', arguments: {'email': widget.email});
       }
     } on DioException catch (e) {
       final msg = e.response?.data?['message'] ?? 'Invalid code';
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg, style: const TextStyle(fontFamily: 'Poppins')),
-          backgroundColor: const Color(0xFFD32F2F),
-          behavior: SnackBarBehavior.floating,
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      setState(() => _otpError = msg);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -180,8 +180,12 @@ class _OtpSheetState extends State<OtpSheet> {
   @override
   void dispose() {
     _timer?.cancel();
-    for (final c in _controllers) c.dispose();
-    for (final f in _focusNodes) f.dispose();
+    for (final c in _controllers) {
+      c.dispose();
+    }
+    for (final f in _focusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -243,9 +247,7 @@ class _OtpSheetState extends State<OtpSheet> {
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
                       maxLength: 1,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -278,6 +280,18 @@ class _OtpSheetState extends State<OtpSheet> {
                 }),
               ),
               const SizedBox(height: 24),
+              if (_otpError != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    _otpError!,
+                    style: const TextStyle(
+                      color: Color(0xFFD32F2F),
+                      fontSize: 12,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ),
               GreenButton(
                 text: 'Verify',
                 onPress: _handleVerify,

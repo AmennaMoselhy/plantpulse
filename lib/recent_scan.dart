@@ -4,9 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'result_page.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
+import 'package:vibration/vibration.dart';
 import 'user_state.dart';
+import 'app_navigator.dart';
+
 
 class ScanRecord {
+  final String? id;
   final String imagePath;
   final String plantName;
   final String? imageUrl;
@@ -18,6 +23,7 @@ class ScanRecord {
   final String? treatment;
 
   ScanRecord({
+    this.id,
     required this.imagePath,
     required this.plantName,
     required this.confidence,
@@ -52,6 +58,7 @@ class ScanRecord {
     final firstResult = results?.isNotEmpty == true ? results!.first : null;
 
     return ScanRecord(
+      id: json['_id'] as String?,
       imagePath: '',
       imageUrl: imageUrl,
       plantName: 'Lettuce',
@@ -108,6 +115,7 @@ Future<void> saveScans() async {
   final list = scansState.scans
       .map(
         (s) => {
+          'id': s.id ?? '',
           'imagePath': s.imagePath,
           'imageUrl': s.imageUrl ?? '',
           'plantName': s.plantName,
@@ -133,6 +141,7 @@ Future<void> loadScans() async {
       decoded
           .map(
             (s) => ScanRecord(
+              id: s['id'],
               imagePath: s['imagePath'] ?? '',
               imageUrl: s['imageUrl'],
               plantName: s['plantName'],
@@ -151,29 +160,31 @@ Future<void> loadScans() async {
   }
 }
 
-Future<void> loadScansFromApi(String token) async {
+Future<void> loadScansFromApi(String token, {bool forceRefresh = false}) async {
   if (token.isEmpty) return;
+
+  final prefs = await SharedPreferences.getInstance();
+  final userCleared = prefs.getBool('userClearedScans') ?? false;
+  if (userCleared && !forceRefresh) return;
+
+  if (!forceRefresh && scansState.isNotEmpty) return;
   try {
     final dio = Dio();
     final response = await dio.get(
       'https://plant-pules-api.vercel.app/api/v1/scan/recent',
       options: Options(headers: {'token': token}),
     );
-    print('API response: ${response.data}');
 
     final List data = response.data['data'] ?? [];
-    print('Data length: ${data.length}');
 
     final apiScans = data
         .map((s) => ScanRecord.fromJson(s as Map<String, dynamic>))
+        .where((s) => s.status == 'Healthy' || s.status == 'Diseased')
         .toList();
 
     scansState.setAll(apiScans);
-    print('Scans set: ${scansState.length}');
     await saveScans();
-  } catch (e) {
-    print('loadScansFromApi error: $e');
-  }
+  } catch (_) {}
 }
 
 class RecentScan extends StatefulWidget {
@@ -241,9 +252,17 @@ class _RecentScanState extends State<RecentScan> {
             ),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
+              if (await Vibration.hasVibrator() == true) {
+                Vibration.vibrate(duration: 100);
+              } else {
+                HapticFeedback.heavyImpact();
+              }
               scansState.clear();
               saveScans();
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('userClearedScans', true);
+              if (!context.mounted) return;
               Navigator.pop(context);
             },
             child: const Text(
@@ -272,7 +291,13 @@ class _RecentScanState extends State<RecentScan> {
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
+                    onTap: () {
+                      if (Navigator.canPop(context)) {
+                        Navigator.pop(context);
+                      } else {
+                        Navigator.pushReplacementNamed(context, 'HomePage');
+                      }
+                    },
                     child: const Icon(
                       Icons.arrow_back_ios_new_rounded,
                       size: 24,
@@ -323,36 +348,70 @@ class _RecentScanState extends State<RecentScan> {
                         ),
                       ),
                     )
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      itemCount: scans.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final actualIndex = scans.length - 1 - index;
-                        final scan = scans[actualIndex];
-                        return Dismissible(
-                          key: Key(scan.imagePath + scan.scanTime.toString()),
-                          direction: DismissDirection.endToStart,
-                          background: Container(
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 20),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFEBEE),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.delete_outline_rounded,
-                              color: Color(0xFFD32F2F),
-                              size: 24,
-                            ),
-                          ),
-                          onDismissed: (_) {
-                            scansState.remove(actualIndex);
-                            saveScans();
-                          },
-                          child: _ScanItem(scan: scan),
+                  : RefreshIndicator(
+                      color: const Color(0xFF399B25),
+                      onRefresh: () async {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('userClearedScans', false);
+                        await loadScansFromApi(
+                          userState.token,
+                          forceRefresh: true,
                         );
+                        if (mounted) setState(() {});
                       },
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        itemCount: scans.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final actualIndex = scans.length - 1 - index;
+                          final scan = scans[actualIndex];
+                          return Dismissible(
+                            key: Key(scan.imagePath + scan.scanTime.toString()),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFEBEE),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.delete_outline_rounded,
+                                color: Color(0xFFD32F2F),
+                                size: 24,
+                              ),
+                            ),
+                            onDismissed: (_) async {
+                              if (await Vibration.hasVibrator() == true) {
+                                Vibration.vibrate(duration: 50);
+                              } else {
+                                HapticFeedback.mediumImpact();
+                              }
+                              final scan = scans[actualIndex];
+                              scansState.remove(actualIndex);
+                              saveScans();
+                              if (scansState.isEmpty) {
+                                final prefs =
+                                    await SharedPreferences.getInstance();
+                                await prefs.setBool('userClearedScans', true);
+                              }
+                              if (scan.id != null && scan.id!.isNotEmpty) {
+                                try {
+                                  final dio = Dio();
+                                  await dio.delete(
+                                    'https://plant-pules-api.vercel.app/api/v1/scan/${scan.id}',
+                                    options: Options(
+                                      headers: {'token': userState.token},
+                                    ),
+                                  );
+                                } catch (_) {}
+                              }
+                            },
+                            child: _ScanItem(scan: scan),
+                          );
+                        },
+                      ),
                     ),
             ),
           ],
@@ -395,8 +454,7 @@ class _ScanItem extends StatelessWidget {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => ResultPage(
+        fadeSlideRoute(ResultPage(
             imagePath: scan.imagePath,
             plantName: scan.plantName,
             status: scan.status,

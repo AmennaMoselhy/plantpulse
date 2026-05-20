@@ -4,8 +4,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'green_button.dart';
 import 'recent_scan.dart';
+import 'package:flutter/services.dart';
 import 'result_page.dart';
 import 'user_state.dart';
+import 'package:vibration/vibration.dart';
+import 'app_navigator.dart';
 
 class ScanProcessing extends StatefulWidget {
   final String imagePath;
@@ -20,8 +23,8 @@ class _ScanProcessingState extends State<ScanProcessing>
     with SingleTickerProviderStateMixin {
   double _progress = 0.0;
   bool _scanComplete = false;
-  late AnimationController _lineController;
-  late Animation<double> _lineAnimation;
+  AnimationController? _lineController;
+  Animation<double>? _lineAnimation;
   Timer? _progressTimer;
   bool _resultSaved = false;
   String? _savedStatus;
@@ -52,13 +55,14 @@ class _ScanProcessingState extends State<ScanProcessing>
   }
 
   void _startAnimation() {
+    _lineController?.dispose();
     _lineController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
     _lineAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _lineController, curve: Curves.easeInOut),
+      CurvedAnimation(parent: _lineController!, curve: Curves.easeInOut),
     );
 
     _progressTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
@@ -72,9 +76,13 @@ class _ScanProcessingState extends State<ScanProcessing>
 
         if (_progress >= 1.0) {
           _progress = 1.0;
-          _lineController.stop();
+          _lineController?.stop();
           timer.cancel();
-          _checkComplete();
+          if (_apiError == null) {
+            _checkComplete();
+          } else {
+            setState(() => _scanComplete = true);
+          }
         }
       });
     });
@@ -115,7 +123,13 @@ class _ScanProcessingState extends State<ScanProcessing>
           : null;
 
       if (decision == 'not_lettuce') {
-        setState(() => _apiDone = true);
+        _progressTimer?.cancel();
+        _lineController?.stop();
+        setState(() {
+          _apiDone = true;
+          _scanComplete = false;
+          _progress = 0.0;
+        });
         _showUnsupportedDialog();
         return;
       }
@@ -130,6 +144,8 @@ class _ScanProcessingState extends State<ScanProcessing>
       });
     } on DioException catch (e) {
       if (!mounted) return;
+      _progressTimer?.cancel();
+      _lineController?.stop();
 
       String errorMsg;
       bool isNetwork = false;
@@ -167,6 +183,8 @@ class _ScanProcessingState extends State<ScanProcessing>
       });
     } catch (e) {
       if (!mounted) return;
+      _progressTimer?.cancel();
+      _lineController?.stop();
       setState(() {
         _apiError = 'Something went wrong. Please try again.';
         _apiDone = true;
@@ -187,7 +205,7 @@ class _ScanProcessingState extends State<ScanProcessing>
     if (_imageLoadFailed || !mounted) return;
     _imageLoadFailed = true;
     _progressTimer?.cancel();
-    _lineController.stop();
+    _lineController?.stop();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _showUnsupportedDialog();
@@ -268,7 +286,7 @@ class _ScanProcessingState extends State<ScanProcessing>
 
   @override
   void dispose() {
-    _lineController.dispose();
+    _lineController?.dispose();
     _progressTimer?.cancel();
     super.dispose();
   }
@@ -361,12 +379,12 @@ class _ScanProcessingState extends State<ScanProcessing>
                         borderRadius: BorderRadius.circular(16),
                         child: _buildImage(),
                       ),
-                      if (!_scanComplete)
+                      if (_lineAnimation != null)
                         AnimatedBuilder(
-                          animation: _lineAnimation,
+                          animation: _lineAnimation!,
                           builder: (context, child) {
                             return Positioned(
-                              top: _lineAnimation.value * (_imgH - 10),
+                              top: _lineAnimation!.value * (_imgH - 10),
                               left: 0,
                               right: 0,
                               child: Container(
@@ -481,9 +499,11 @@ class _ScanProcessingState extends State<ScanProcessing>
             ),
             child: Row(
               children: [
-                const Icon(
-                  Icons.wifi_off_rounded,
-                  color: Color(0xFFD32F2F),
+                Icon(
+                  _isNetworkError
+                      ? Icons.wifi_off_rounded
+                      : Icons.error_outline_rounded,
+                  color: const Color(0xFFD32F2F),
                   size: 22,
                 ),
                 const SizedBox(width: 10),
@@ -504,7 +524,16 @@ class _ScanProcessingState extends State<ScanProcessing>
           const SizedBox(height: 16),
           GreenButton(
             text: 'Try Again',
-            onPress: () {
+            onPress: () async {
+              if (await Vibration.hasVibrator() == true) {
+                Vibration.vibrate(duration: 30);
+              } else {
+                HapticFeedback.lightImpact();
+              }
+              _progressTimer?.cancel();
+              _progressTimer = null;
+              _lineController?.stop();
+              _lineController?.reset();
               setState(() {
                 _apiError = null;
                 _isNetworkError = false;
@@ -513,9 +542,12 @@ class _ScanProcessingState extends State<ScanProcessing>
                 _progress = 0.0;
                 _resultSaved = false;
                 _savedStatus = null;
+                _imageLoadFailed = false;
               });
-              _startAnimation();
-              _callScanApi();
+              Future.microtask(() {
+                _startAnimation();
+                _callScanApi();
+              });
             },
           ),
         ],
@@ -560,12 +592,17 @@ class _ScanProcessingState extends State<ScanProcessing>
         GreenButton(
           text: 'See Result',
           onPress: () async {
+            if (await Vibration.hasVibrator() == true) {
+              Vibration.vibrate(duration: 50);
+            } else {
+              HapticFeedback.mediumImpact();
+            }
             if (_resultSaved) {
               if (!mounted) return;
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => ResultPage(
+                fadeSlideRoute(
+                  ResultPage(
                     imagePath: widget.imagePath,
                     plantName: 'Lettuce',
                     status: _savedStatus!,
@@ -588,6 +625,7 @@ class _ScanProcessingState extends State<ScanProcessing>
                 imagePath: widget.imagePath,
                 plantName: 'Lettuce',
                 status: status,
+                imageUrl: null,
                 confidence: _apiConfidence ?? '0',
                 scanTime: DateTime.now(),
                 diseaseName: _apiDiseaseName,
@@ -600,11 +638,12 @@ class _ScanProcessingState extends State<ScanProcessing>
             if (!mounted) return;
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => ResultPage(
+              fadeSlideRoute(
+                ResultPage(
                   imagePath: widget.imagePath,
                   plantName: 'Lettuce',
                   status: _savedStatus!,
+                  imageUrl: null,
                   confidence: _apiConfidence ?? '0',
                   diseaseName: _apiDiseaseName,
                   description: _apiDescription,

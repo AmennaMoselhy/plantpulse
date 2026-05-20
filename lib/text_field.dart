@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class Text_field extends StatefulWidget {
+class AppTextField extends StatefulWidget {
   final String title;
   final String hintText;
   final bool isPassword;
@@ -9,8 +9,9 @@ class Text_field extends StatefulWidget {
   final TextEditingController? controller;
   final String? Function(String?)? validator;
   final bool enabled;
+  final Iterable<String>? autofillHints;
 
-  const Text_field({
+  const AppTextField({
     super.key,
     required this.title,
     required this.hintText,
@@ -20,13 +21,14 @@ class Text_field extends StatefulWidget {
     this.controller,
     this.validator,
     this.enabled = true,
+    this.autofillHints,
   });
 
   @override
-  State<Text_field> createState() => _Text_fieldState();
+  State<AppTextField > createState() => _AppTextFieldState();
 }
 
-class _Text_fieldState extends State<Text_field> {
+class _AppTextFieldState  extends State<AppTextField> {
   bool _passwordHidden = true;
 
   @override
@@ -54,6 +56,8 @@ class _Text_fieldState extends State<Text_field> {
           textInputAction: TextInputAction.next,
           enableSuggestions: !widget.isPassword,
           autocorrect: !widget.isPassword,
+          autofillHints: widget.autofillHints,
+
           onTapOutside: (_) => FocusScope.of(context).unfocus(),
           style: const TextStyle(
             fontSize: 14,

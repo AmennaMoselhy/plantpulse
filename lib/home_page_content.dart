@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'user_state.dart';
 import 'recent_scan.dart';
 import 'result_page.dart';
+import 'app_navigator.dart';
 
 class HomePageContent extends StatefulWidget {
   final String firstName;
@@ -49,6 +50,7 @@ class _HomePageContentState extends State<HomePageContent> {
   }
 
   Future<void> _syncScansWithApi() async {
+    if (scansState.isNotEmpty) return;
     try {
       final dio = Dio();
       final response = await dio.get(
@@ -94,109 +96,119 @@ class _HomePageContentState extends State<HomePageContent> {
         ? _diseasedScans
         : scans.where((s) => s.status == 'Diseased').length;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        top: size.height * 0.0296,
-        right: size.width * 0.064,
-        left: size.width * 0.064,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 48),
-          _buildHeader(),
-          SizedBox(height: size.height * 0.0296),
-          const Text(
-            'Statistics',
-            style: TextStyle(
-              color: Color(0xFF1F1F1F),
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
+    return RefreshIndicator(
+      color: const Color(0xFF399B25),
+      onRefresh: () async {
+        await _syncScansWithApi();
+        await _loadStats();
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Padding(
+          padding: EdgeInsets.only(
+            top: size.height * 0.0296,
+            right: size.width * 0.064,
+            left: size.width * 0.064,
           ),
-          const SizedBox(height: 16),
-          _buildStatCard(
-            imagePath: 'assets/totalScans.png',
-            label: 'Total Scans',
-            value: '$totalVal',
-            bgColor: const Color(0xFFEBF5E9),
-            borderColor: const Color(0xFF61AF51),
-          ),
-          const SizedBox(height: 16),
-          Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: _buildStatCard(
-                  imagePath: 'assets/health.png',
-                  label: 'Healthy',
-                  value: '$healthyVal',
-                  bgColor: const Color(0xFFEBF5E9),
-                  borderColor: const Color(0xFF61AF51),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildStatCard(
-                  imagePath: 'assets/disease.png',
-                  label: 'Diseased',
-                  value: '$diseasedVal',
-                  bgColor: const Color(0xFFFFF4E9),
-                  borderColor: const Color(0xFFFFA352),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
+              const SizedBox(height: 48),
+              _buildHeader(),
+              SizedBox(height: size.height * 0.0296),
               const Text(
-                'Recent Scans',
+                'Statistics',
                 style: TextStyle(
                   color: Color(0xFF1F1F1F),
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              GestureDetector(
-                onTap: _goToRecentScan,
-                child: const Row(
-                  children: [
-                    Text(
-                      'See More',
-                      style: TextStyle(
-                        color: Color(0xFF399B25),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    SizedBox(width: 2),
-                    Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 12,
-                      color: Color(0xFF399B25),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 16),
+              _buildStatCard(
+                imagePath: 'assets/totalScans.png',
+                label: 'Total Scans',
+                value: '$totalVal',
+                bgColor: const Color(0xFFEBF5E9),
+                borderColor: const Color(0xFF61AF51),
               ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard(
+                      imagePath: 'assets/health.png',
+                      label: 'Healthy',
+                      value: '$healthyVal',
+                      bgColor: const Color(0xFFEBF5E9),
+                      borderColor: const Color(0xFF61AF51),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildStatCard(
+                      imagePath: 'assets/disease.png',
+                      label: 'Diseased',
+                      value: '$diseasedVal',
+                      bgColor: const Color(0xFFFFF4E9),
+                      borderColor: const Color(0xFFFFA352),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Recent Scans',
+                    style: TextStyle(
+                      color: Color(0xFF1F1F1F),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _goToRecentScan,
+                    child: const Row(
+                      children: [
+                        Text(
+                          'See More',
+                          style: TextStyle(
+                            color: Color(0xFF399B25),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 12,
+                          color: Color(0xFF399B25),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (scansState.isEmpty)
+                const Text(
+                  'No scans yet',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF717171),
+                    fontFamily: 'Poppins',
+                  ),
+                )
+              else
+                ...latestTwo.map((scan) => _MiniScanItem(scan: scan)),
+              const SizedBox(height: 16),
+              _buildDidYouKnow(),
+              const SizedBox(height: 24),
             ],
           ),
-          const SizedBox(height: 12),
-          if (scansState.isEmpty)
-            const Text(
-              'No scans yet',
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF717171),
-                fontFamily: 'Poppins',
-              ),
-            )
-          else
-            ...latestTwo.map((scan) => _MiniScanItem(scan: scan)),
-          const SizedBox(height: 16),
-          _buildDidYouKnow(),
-          const Spacer(),
-        ],
+        ),
       ),
     );
   }
@@ -245,7 +257,7 @@ class _HomePageContentState extends State<HomePageContent> {
                   height: 34,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    color:  Color(0xFFEFF3EE),
+                    color: Color(0xFFEFF3EE),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: Image.asset(
@@ -377,8 +389,8 @@ class _MiniScanItem extends StatelessWidget {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => ResultPage(
+        fadeSlideRoute(
+          ResultPage(
             imagePath: scan.imagePath,
             plantName: scan.plantName,
             status: scan.status,
@@ -400,7 +412,7 @@ class _MiniScanItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),

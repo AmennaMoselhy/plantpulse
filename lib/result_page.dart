@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-// import '/user_state.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 
 class ResultPage extends StatefulWidget {
   final String imagePath;
@@ -44,12 +46,48 @@ class _ResultPageState extends State<ResultPage> {
     return widget.confidence;
   }
 
+  Future<void> _shareResult() async {
+    final status = widget.status;
+    final plant = widget.plantName;
+    final confidence = safeConfidence;
+    final disease = widget.diseaseName != null ? '\nDisease: ${widget.diseaseName}' : '';
+    final message = '🌿 Plant Pulse Scan Result\n\nPlant: $plant\nStatus: $status$disease\nAccuracy: $confidence%\n\nScanned with Plant Pulse App';
+
+    try {
+      if (widget.imageUrl != null && widget.imageUrl!.isNotEmpty) {
+        final response = await Dio().get(
+          widget.imageUrl!,
+          options: Options(responseType: ResponseType.bytes),
+        );
+        final tempDir = await getTemporaryDirectory();
+        final file = File('${tempDir.path}/share_image.jpg');
+        await file.writeAsBytes(response.data);
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          text: message,
+        );
+      } else if (widget.imagePath.isNotEmpty) {
+        final exists = await File(widget.imagePath).exists();
+        if (exists) {
+          await Share.shareXFiles(
+            [XFile(widget.imagePath)],
+            text: message,
+          );
+          return;
+        }
+        Share.share(message);
+      } else {
+        Share.share(message);
+      }
+    } catch (_) {
+      Share.share(message);
+    }
+  }
+
   void _handleBack() {
     if (widget.fromRecentScan) {
-      // came from RecentScan → just pop back to it
       Navigator.of(context).pop();
     } else {
-      // came from ScanProcessing → pop back to RecentScan
       Navigator.of(context).pushNamedAndRemoveUntil(
         'RecentScan',
         (route) => route.settings.name == 'HomePage',
@@ -119,7 +157,14 @@ class _ResultPageState extends State<ResultPage> {
               ),
             ),
           ),
-          const SizedBox(width: 24),
+          GestureDetector(
+            onTap: _shareResult,
+            child: const Icon(
+              Icons.share_rounded,
+              size: 24,
+              color: Color(0xFF4A4A4A),
+            ),
+          ),
         ],
       ),
     );

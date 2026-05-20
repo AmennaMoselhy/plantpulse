@@ -3,6 +3,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
 import 'green_button.dart';
 import 'down_text.dart';
+import 'dart:async';
 
 class OTPHelper extends StatefulWidget {
   final String title;
@@ -30,9 +31,31 @@ class _OTPHelperState extends State<OTPHelper> {
 
   bool _isValidEmail = false;
   String? _emailError;
+  int _resendCooldown = 0;
+  Timer? _resendTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startResendCooldown();
+  }
+
+  void _startResendCooldown() {
+    _resendCooldown = 20;
+    _resendTimer?.cancel();
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      if (_resendCooldown == 0) {
+        t.cancel();
+        return;
+      }
+      setState(() => _resendCooldown--);
+    });
+  }
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _emailController.dispose();
     super.dispose();
   }
@@ -105,15 +128,21 @@ class _OTPHelperState extends State<OTPHelper> {
             SizedBox(height: size.height * 0.0591),
             DownText(
               label: "Didn't receive a code?",
-              actionText: 'Resend code',
-              onTap: () => Fluttertoast.showToast(
-                msg: 'Code is being sent again...',
-                toastLength: Toast.LENGTH_SHORT,
-                gravity: ToastGravity.CENTER,
-                backgroundColor: const Color(0xFF399B25),
-                textColor: Colors.white,
-                fontSize: 14,
-              ),
+              actionText: _resendCooldown > 0
+                  ? 'Resend code (00:${_resendCooldown.toString().padLeft(2, '0')})'
+                  : 'Resend code',
+              onTap: () {
+                if (_resendCooldown > 0) return;
+                _startResendCooldown();
+                Fluttertoast.showToast(
+                  msg: 'Code is being sent again...',
+                  toastLength: Toast.LENGTH_SHORT,
+                  gravity: ToastGravity.CENTER,
+                  backgroundColor: const Color(0xFF399B25),
+                  textColor: Colors.white,
+                  fontSize: 14,
+                );
+              },
             ),
           ],
         ],
@@ -207,5 +236,4 @@ class _OTPHelperState extends State<OTPHelper> {
       ),
     );
   }
-
 }

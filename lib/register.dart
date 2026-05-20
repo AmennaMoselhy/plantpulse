@@ -188,6 +188,9 @@ class _RegisterFormState extends State<_RegisterForm> {
                       arguments: {
                         'email': email,
                         'password': password,
+                        'firstName': firstName,
+                        'fullName': fullName,
+                        'gender': _gender!,
                       },
                     );
                   },
@@ -249,7 +252,7 @@ class _RegisterFormState extends State<_RegisterForm> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text_field(
+            AppTextField (
               controller: _nameController,
               keyboardType: TextInputType.name,
               title: 'Name',
@@ -257,7 +260,7 @@ class _RegisterFormState extends State<_RegisterForm> {
               validator: _validateName,
             ),
             SizedBox(height: size.height * 0.005),
-            Text_field(
+            AppTextField (
               title: 'Email',
               hintText: 'Enter Your Email',
               keyboardType: TextInputType.emailAddress,
@@ -265,7 +268,7 @@ class _RegisterFormState extends State<_RegisterForm> {
               validator: _validateEmail,
             ),
             SizedBox(height: size.height * 0.005),
-            Text_field(
+            AppTextField (
               title: 'Password',
               controller: _passwordController,
               hintText: 'Enter Your Password',
@@ -274,7 +277,7 @@ class _RegisterFormState extends State<_RegisterForm> {
               validator: _validatePassword,
             ),
             SizedBox(height: size.height * 0.005),
-            Text_field(
+            AppTextField (
               controller: _confirmPasswordController,
               title: 'Confirm Password',
               hintText: 'Enter Your Password',
